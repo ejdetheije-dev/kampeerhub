@@ -8,7 +8,7 @@ const PLACEHOLDER_CAMPINGS = [
 
 export default function CampingList() {
   return (
-    <div className="w-96 flex flex-col border-l border-gray-800 overflow-hidden shrink-0">
+    <div className="flex-1 flex flex-col overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-800">
         <span className="text-sm text-gray-400">
           <span className="text-[#209dd7] font-semibold">{PLACEHOLDER_CAMPINGS.length}</span> campings gevonden

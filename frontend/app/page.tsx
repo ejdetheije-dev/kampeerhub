@@ -1,5 +1,6 @@
 import MapPanel from "@/components/MapPanel";
 import CampingList from "@/components/CampingList";
+import ChatPanel from "@/components/ChatPanel";
 
 export default function Home() {
   return (
@@ -14,7 +15,12 @@ export default function Home() {
       {/* Split screen */}
       <div className="flex flex-1 overflow-hidden">
         <MapPanel />
-        <CampingList />
+
+        {/* Right column */}
+        <div className="w-96 flex flex-col border-l border-gray-800 shrink-0 overflow-hidden">
+          <CampingList />
+          <ChatPanel />
+        </div>
       </div>
     </div>
   );
