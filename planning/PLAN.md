@@ -1,10 +1,16 @@
-# Boilerplate — project nama
+# plan — kampeerhub
 
 ## Project Specification
 
 ## 1. Vision
 
-Boilerplate is a visually stunning AI-powered project that lets users ... and integrates an LLM chat assistant that can ... and execute ...  on the user's behalf. It looks and feels like a modern .. with an AI copilot.
+Boilerplate is a visually stunning AI-powered project that lets users look for campsites in europe and integrates an LLM chat assistant that can find campsites on a map and filter on various aspects of the campsite. It can compare campsites and propose best fit to the users expressed needs. It can execute reservations to the chose campsite on the user's behalf. 
+
+## Wat bouw je
+Een persoonlijke camping zoek-app voor vakantie in Europa (focus: Frankrijk).  
+Split-screen interface: kaart links, gefilterde lijst rechts.  
+Data: OpenStreetMap (locaties + faciliteiten) + Eurocampings deeplinks (reviews).
+
 
 It is built entirely by Coding Agents demonstrating how orchestrated AI agents can produce a production-quality full-stack application. Agents interact through files in `planning/`.
 
@@ -14,19 +20,22 @@ It is built entirely by Coding Agents demonstrating how orchestrated AI agents c
 
 The user runs a single Docker command (or a provided start script). A browser opens to `http://localhost:8000`. No login, no signup. They immediately see:
 
--  A dark, data-rich  terminal aesthetic
+- A dark, data-rich  terminal aesthetic
+- a map of europe including locations of campsites
+- a list of proposed campsites based on user preferences
 - An AI chat panel ready to assist
 
 ### What the User Can Do
 
-- **Watch** — user can see this 
-- **Chat with the AI assistant** — ask about ... 
+- **Watch** — user can see boht the map of europe and the initial selections of campsite
+- **interact** - changes user preferences
+- **Chat with the AI assistant** — ask about selecting, refining and booking campsites 
 
 ### Visual Design
 
 - **Dark theme**: backgrounds around `#0d1117` or `#1a1a2e`, muted gray borders, no pure black
 - **Connection status indicator**: a small colored dot (green = connected, yellow = reconnecting, red = disconnected) visible in the header
-- **Professional, data-dense layout**: inspired by modern terminals — every pixel earns its place
+- **Professional, data-dense layout**: inspired by modern terminals and the booking.com app — every pixel earns its place
 - **Responsive but desktop-first**: optimized for wide screens, functional on tablet
 
 ### Color Scheme
@@ -56,7 +65,7 @@ The user runs a single Docker command (or a provided start script). A browser op
 - **Frontend**: Next.js with TypeScript, built as a static export (`output: 'export'`), served by FastAPI as static files
 - **Backend**: FastAPI (Python), managed as a `uv` project
 - **Database**: SQLite, single file at `db/boilerplate.db`, volume-mounted for persistence
-- **Real-time data**: Server-Sent Events (SSE) — simpler than WebSockets, one-way server→client push, works everywhere
+- **Real-time data**: (When applicable) Server-Sent Events (SSE) — simpler than WebSockets, one-way server→client push, works everywhere
 - **AI integration**: LiteLLM → OpenRouter (Cerebras for fast inference), with structured outputs 
 
 
@@ -69,6 +78,117 @@ The user runs a single Docker command (or a provided start script). A browser op
 | SQLite over Postgres | No auth = no multi-user = no need for a database server; self-contained, zero config |
 | Single Docker container | Students run one command; no docker-compose for production, no service orchestration |
 | uv for Python | Fast, modern Python project management; reproducible lockfile; what students should learn |
+
+## Tech stack
+
+| Onderdeel | Keuze | Reden |
+| Kaart | Leaflet.js + OpenStreetMap tiles | Gratis, geen key nodig |
+| Camping data | Overpass API (OSM) | Gratis, live, 50k+ campings Europa |
+| Weer | Open-Meteo API | Gratis, geen key, per coördinaat |
+| Reviews | Eurocampings deeplink | Geen API nodig, direct naar pagina |
+
+
+## Kernfunctionaliteit — stap voor stap
+LET OP - DIT IS EEN SUGGESTIE VOOR EEN STAPPENPLAN - JE BENT NIET VERPLICHT DEZE STAPPEN OF DE TECH STACK VAN DEZE STAPPEN TE VOLGEN
+
+### Stap 1: Project opzetten
+```bash
+npm create vite@latest camping-app -- --template react-ts
+cd camping-app
+npm install leaflet react-leaflet @types/leaflet tailwindcss
+```
+
+### Stap 2: Overpass query voor campings
+
+De basis Overpass query voor campings in een bounding box:
+
+```
+[out:json][timeout:30];
+(
+  node["tourism"="camp_site"]({{bbox}});
+  way["tourism"="camp_site"]({{bbox}});
+  relation["tourism"="camp_site"]({{bbox}});
+);
+out center tags;
+```
+
+Relevante OSM tags om op te filteren:
+- `dog` = yes/no → honden toegestaan
+- `internet_access` = wlan → wifi
+- `swimming_pool` = yes → zwembad  
+- `electricity` = yes → stroomaansluiting
+- `nudism` = yes/designated → naturistencamping
+- `capacity` (getal) → klein (<50) of groot (>200)
+- `fee` = yes + `charge` → prijsindicatie
+- `access` = private/public
+
+### Stap 3: Eurocampings deeplink
+
+```typescript
+// src/utils/eurocampings.ts
+export function getEurocampingsUrl(name: string, lat: number, lon: number): string {
+  // Zoek op naam in Eurocampings
+  const query = encodeURIComponent(name);
+  return `https://www.eurocampings.nl/zoeken/?q=${query}`;
+}
+
+// Of directer: zoek op coördinaten via hun kaart
+export function getEurocampingsMapUrl(lat: number, lon: number): string {
+  return `https://www.eurocampings.nl/kaart/#lat=${lat}&lng=${lon}&zoom=14`;
+}
+```
+
+### Stap 4: Afstand tot zee
+
+Gebruik de OSM-tag `natural=coastline` of bereken afstand tot kust via:
+- Eenvoudig: hardcode Bretonse kustlijn als GeoJSON bounding box
+- Beter: Overpass query voor dichtste kustpunt (zwaar, alleen on-demand)
+- Praktisch: toon coördinaten en laat gebruiker zelf inschatten via kaart
+
+### Stap 5: Weer per camping (Open-Meteo)
+
+```typescript
+// src/hooks/useWeather.ts
+async function getWeather(lat: number, lon: number) {
+  const url = `https://api.open-meteo.com/v1/forecast?` +
+    `latitude=${lat}&longitude=${lon}` +
+    `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode` +
+    `&forecast_days=7&timezone=Europe%2FParis`;
+  const res = await fetch(url);
+  return res.json();
+}
+```
+
+---
+
+## Interface layout
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  🏕️ Camping App    [Zoek regio...]    [Filters ▼]        │
+├──────────────────────────┬──────────────────────────────┤
+│                          │  📋 42 campings gevonden      │
+│      LEAFLET KAART       │  ┌─────────────────────────┐ │
+│                          │  │ 🏕️ Camping Le Vieux Bourg│ │
+│   📍 📍    📍           │  │ ⭐ Eurocampings →        │ │
+│        📍               │  │ 🐕 🌊 ⚡ 📶            │ │
+│   📍                    │  │ 2,3 km van zee  ~€25/nt  │ │
+│                          │  └─────────────────────────┘ │
+│                          │  ┌─────────────────────────┐ │
+│                          │  │ 🏕️ Camping de la Plage  │ │
+│                          │  │ ⭐ Eurocampings →        │ │
+└──────────────────────────┴──────────────────────────────┘
+```
+
+### Filterpanel (uitklapbaar):
+- **Faciliteiten**: checkboxes Honden / Wifi / Zwembad / Stroom
+- **Type**: Klein (<50 plekken) / Middelgroot / Groot / Naturist
+- **Afstand tot zee**: slider 0–20 km (via OSM bbox benadering)
+- **Prijs**: slider €0–€80 per nacht
+
+---
+
+
 
 
 ---
@@ -126,7 +246,7 @@ LLM_MOCK=false
 
 ---
 
-### SSE Streaming
+### SSE Streaming (when applicable)
 
 - Endpoint: to be determined
 - Long-lived SSE connection; client uses native `EventSource` API
@@ -146,8 +266,7 @@ The backend checks for the SQLite database on startup (or first request). If the
 
 ### Schema
 
-All tables include a `user_id` column defaulting to `"default"`. This is hardcoded for now (single-user) but enables future multi-user support without schema migration.
-
+to be determined
 
 ## 8. API Endpoints
 
@@ -181,7 +300,7 @@ execution specified by the LLM execute automatically — no confirmation dialog.
 
 ### System Prompt Guidance
 
-The LLM should be prompted as "Boilerplate, an AI assistant" with instructions to:
+The LLM should be prompted as "kampeerhub, een AI assistent" with instructions to:
 
 - Be concise and data-driven in responses
 - Always respond with valid structured JSON
@@ -236,10 +355,10 @@ FastAPI serves the static frontend files and all API routes on port 8000.
 The SQLite database persists via a named Docker volume:
 
 ```bash
-docker run -v boilerplate-data:/app/db -p 8000:8000 --env-file .env boilerplate
+docker run -v kampeerhub-data:/app/db -p 8000:8000 --env-file .env kampeerhub
 ```
 
-The `db/` directory in the project root maps to `/app/db` in the container. The backend writes `finally.db` to this path.
+The `db/` directory in the project root maps to `/app/db` in the container. The backend writes `kampeerhub.db` to this path.
 
 ### Start/Stop Scripts
 
