@@ -1,0 +1,288 @@
+# Boilerplate — project nama
+
+## Project Specification
+
+## 1. Vision
+
+Boilerplate is a visually stunning AI-powered project that lets users ... and integrates an LLM chat assistant that can ... and execute ...  on the user's behalf. It looks and feels like a modern .. with an AI copilot.
+
+It is built entirely by Coding Agents demonstrating how orchestrated AI agents can produce a production-quality full-stack application. Agents interact through files in `planning/`.
+
+## 2. User Experience
+
+### First Launch
+
+The user runs a single Docker command (or a provided start script). A browser opens to `http://localhost:8000`. No login, no signup. They immediately see:
+
+-  A dark, data-rich  terminal aesthetic
+- An AI chat panel ready to assist
+
+### What the User Can Do
+
+- **Watch** — user can see this 
+- **Chat with the AI assistant** — ask about ... 
+
+### Visual Design
+
+- **Dark theme**: backgrounds around `#0d1117` or `#1a1a2e`, muted gray borders, no pure black
+- **Connection status indicator**: a small colored dot (green = connected, yellow = reconnecting, red = disconnected) visible in the header
+- **Professional, data-dense layout**: inspired by modern terminals — every pixel earns its place
+- **Responsive but desktop-first**: optimized for wide screens, functional on tablet
+
+### Color Scheme
+- Accent Yellow: `#ecad0a`
+- Blue Primary: `#209dd7`
+- Purple Secondary: `#753991` (submit buttons)
+
+## 3. Architecture Overview
+
+### Single Container, Single Port
+
+```
+┌─────────────────────────────────────────────────┐
+│  Docker Container (port 8000)                   │
+│                                                 │
+│  FastAPI (Python/uv)                            │
+│  ├── /api/*          REST endpoints             │
+│  ├── /api/stream/*   SSE streaming              │
+│  └── /*              Static file serving         │
+│                      (Next.js export)            │
+│                                                 │
+│  SQLite database (volume-mounted)               │
+│  Background task: to be determined              │
+└─────────────────────────────────────────────────┘
+```
+
+- **Frontend**: Next.js with TypeScript, built as a static export (`output: 'export'`), served by FastAPI as static files
+- **Backend**: FastAPI (Python), managed as a `uv` project
+- **Database**: SQLite, single file at `db/boilerplate.db`, volume-mounted for persistence
+- **Real-time data**: Server-Sent Events (SSE) — simpler than WebSockets, one-way server→client push, works everywhere
+- **AI integration**: LiteLLM → OpenRouter (Cerebras for fast inference), with structured outputs 
+
+
+### Why These Choices
+
+| Decision | Rationale |
+|---|---|
+| SSE over WebSockets | One-way push is all we need; simpler, no bidirectional complexity, universal browser support |
+| Static Next.js export | Single origin, no CORS issues, one port, one container, simple deployment |
+| SQLite over Postgres | No auth = no multi-user = no need for a database server; self-contained, zero config |
+| Single Docker container | Students run one command; no docker-compose for production, no service orchestration |
+| uv for Python | Fast, modern Python project management; reproducible lockfile; what students should learn |
+
+
+---
+
+## 4. Directory Structure
+
+```
+boilerplate/
+├── frontend/                 # Next.js TypeScript project (static export)
+├── backend/                  # FastAPI uv project (Python)
+│   └── db/                   # Schema definitions, seed data, migration logic
+├── planning/                 # Project-wide documentation for agents
+│   ├── PLAN.md               # This document
+│   └── ...                   # Additional agent reference docs
+├── scripts/
+│   ├── start_mac.sh          # Launch Docker container (macOS/Linux)
+│   ├── stop_mac.sh           # Stop Docker container (macOS/Linux)
+│   ├── start_windows.ps1     # Launch Docker container (Windows PowerShell)
+│   └── stop_windows.ps1      # Stop Docker container (Windows PowerShell)
+├── test/                     # Playwright E2E tests + docker-compose.test.yml
+├── database/                 # Volume mount target (SQLite file lives here at runtime)
+│   └── .gitkeep              # Directory exists in repo; boilerplate.db is gitignored
+├── Dockerfile                # Multi-stage build (Node → Python)
+├── docker-compose.yml        # Optional convenience wrapper
+├── .env                      # Environment variables (gitignored, .env.example committed)
+└── .gitignore
+```
+
+### Key Boundaries
+
+- **`frontend/`** is a self-contained Next.js project. It knows nothing about Python. It talks to the backend via `/api/*` endpoints and `/api/stream/*` SSE endpoints. Internal structure is up to the Frontend Engineer agent.
+- **`backend/`** is a self-contained uv project with its own `pyproject.toml`. It owns all server logic including database initialization, schema, seed data, API routes, SSE streaming, market data, and LLM integration. Internal structure is up to the Backend/Market Data agents.
+- **`backend/db/`** contains schema SQL definitions and seed logic. The backend lazily initializes the database on first request — creating tables and seeding default data if the SQLite file doesn't exist or is empty.
+- **`database/`** at the top level is the runtime volume mount point. The SQLite file (`db/boilerplate.db`) is created here by the backend and persists across container restarts via Docker volume.
+- **`planning/`** contains project-wide documentation, including this plan. All agents reference files here as the shared contract.
+- **`test/`** contains Playwright E2E tests and supporting infrastructure (e.g., `docker-compose.test.yml`). Unit tests live within `frontend/` and `backend/` respectively, following each framework's conventions.
+- **`scripts/`** contains start/stop scripts that wrap Docker commands.
+
+---
+
+## 5. Environment Variables
+
+```bash
+# Required: OpenRouter API key for LLM chat functionality
+OPENROUTER_API_KEY=your-openrouter-api-key-here
+
+# Optional: Set to "true" for deterministic mock LLM responses (testing)
+LLM_MOCK=false
+```
+
+### Behavior
+
+- If `LLM_MOCK=true` → backend returns deterministic mock LLM responses (for E2E tests)
+- The backend reads `.env` from the project root (mounted into the container or read via docker `--env-file`)
+
+---
+
+### SSE Streaming
+
+- Endpoint: to be determined
+- Long-lived SSE connection; client uses native `EventSource` API
+- Client handles reconnection automatically (EventSource has built-in retry)
+
+---
+
+## 7. Database
+
+### SQLite with Lazy Initialization
+
+The backend checks for the SQLite database on startup (or first request). If the file doesn't exist or tables are missing, it creates the schema and seeds default data. This means:
+
+- No separate migration step
+- No manual database setup
+- Fresh Docker volumes start with a clean, seeded database automatically
+
+### Schema
+
+All tables include a `user_id` column defaulting to `"default"`. This is hardcoded for now (single-user) but enables future multi-user support without schema migration.
+
+
+## 8. API Endpoints
+
+---
+
+## 9. LLM Integration
+
+When writing code to make calls to LLMs, use cerebras-inference skill to use LiteLLM via OpenRouter to the `openrouter/openai/gpt-oss-120b` model with Cerebras as the inference provider. Structured Outputs should be used to interpret the results.
+
+There is an OPENROUTER_API_KEY in the .env file in the project root.
+
+### How It Works
+
+When the user sends a chat message, the backend:
+
+to be determined
+
+### Structured Output Schema
+
+The LLM is instructed to respond with JSON matching this schema:
+
+to be determined
+
+
+### Auto-Execution
+
+execution specified by the LLM execute automatically — no confirmation dialog. This is a deliberate design choice:
+- It creates an impressive, fluid demo experience
+- It demonstrates agentic AI capabilities 
+
+
+### System Prompt Guidance
+
+The LLM should be prompted as "Boilerplate, an AI assistant" with instructions to:
+
+- Be concise and data-driven in responses
+- Always respond with valid structured JSON
+
+### LLM Mock Mode
+
+When `LLM_MOCK=true`, the backend returns deterministic mock responses instead of calling OpenRouter. This enables:
+- Fast, free, reproducible E2E tests
+- Development without an API key
+- CI/CD pipelines
+
+---
+
+## 10. Frontend Design
+
+### Layout
+
+The frontend is a single-page application with a dense, terminal-inspired layout. The specific component architecture and layout system is up to the Frontend Engineer, but the UI should include these elements:
+
+to be determinede
+
+### Technical Notes
+
+- Canvas-based charting library preferred (Lightweight Charts or Recharts) for performance
+- All API calls go to the same origin (`/api/*`) — no CORS configuration needed
+- Tailwind CSS for styling with a custom dark theme
+
+---
+
+## 11. Docker & Deployment
+
+### Multi-Stage Dockerfile
+
+```
+Stage 1: Node 20 slim
+  - Copy frontend/
+  - npm install && npm run build (produces static export)
+
+Stage 2: Python 3.12 slim
+  - Install uv
+  - Copy backend/
+  - uv sync (install Python dependencies from lockfile)
+  - Copy frontend build output into a static/ directory
+  - Expose port 8000
+  - CMD: uvicorn serving FastAPI app
+```
+
+FastAPI serves the static frontend files and all API routes on port 8000.
+
+### Docker Volume
+
+The SQLite database persists via a named Docker volume:
+
+```bash
+docker run -v boilerplate-data:/app/db -p 8000:8000 --env-file .env boilerplate
+```
+
+The `db/` directory in the project root maps to `/app/db` in the container. The backend writes `finally.db` to this path.
+
+### Start/Stop Scripts
+
+**`scripts/start_mac.sh`** (macOS/Linux):
+- Builds the Docker image if not already built (or if `--build` flag passed)
+- Runs the container with the volume mount, port mapping, and `.env` file
+- Prints the URL to access the app
+- Optionally opens the browser
+
+**`scripts/stop_mac.sh`** (macOS/Linux):
+- Stops and removes the running container
+- Does NOT remove the volume (data persists)
+
+**`scripts/start_windows.ps1`** / **`scripts/stop_windows.ps1`**: PowerShell equivalents for Windows.
+
+All scripts should be idempotent — safe to run multiple times.
+
+### Optional Cloud Deployment
+
+The container is designed to deploy to AWS App Runner, Render, or any container platform. A Terraform configuration for App Runner may be provided in a `deploy/` directory as a stretch goal, but is not part of the core build.
+
+---
+
+## 12. Testing Strategy
+
+### Unit Tests (within `frontend/` and `backend/`)
+
+**Backend (pytest)**:
+- LLM: structured output parsing handles all valid schemas, graceful handling of malformed responses, trade validation within chat flow
+- API routes: correct status codes, response shapes, error handling
+
+**Frontend (React Testing Library or similar)**:
+
+- Chat message rendering and loading state
+
+### E2E Tests (in `test/`)
+
+**Infrastructure**: A separate `docker-compose.test.yml` in `test/` that spins up the app container plus a Playwright container. This keeps browser dependencies out of the production image.
+
+**Environment**: Tests run with `LLM_MOCK=true` by default for speed and determinism.
+
+**Key Scenarios**:
+- Fresh start: 
+- Add and remove 
+- AI chat (mocked): send a message, receive a response
+- SSE resilience: disconnect and verify reconnection
