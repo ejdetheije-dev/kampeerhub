@@ -29,22 +29,22 @@ Fix marker icon bug: gebruik custom icon of importeer leaflet-defaulticon-compat
 ## Eurocampings links
 Altijd openen in nieuw tabblad (target="_blank")
 Deeplink formaat: https://www.eurocampings.nl/zoeken/?q={naam}
-```
 
 ---
 
 ## Bouwvolgorde (aanbevolen)
 
-1. **Basis scaffold** 
-2. **Kaart** — Leaflet kaart met OSM tiles, centreer op Frankrijk
-3. **Overpass hook** — Fetch campings in huidige kaartview
-4. **Pins op kaart** — Campings als markers, klikbaar
-5. **Lijst rechts** — Zelfde data als kaartpins, gesorteerd op afstand
-6. **Filters** — Faciliteiten, type, prijs toggles
-7. **Detail overlay** — Bij klik op camping: naam, tags, Eurocampings link
-8. **Weer widget** — Open-Meteo per geselecteerde camping
-9. **Favorieten** — Hart-icoon + opslag
-10. **Deploy** 
+1. **Basis scaffold** — DONE (KAM-1): FastAPI backend, Next.js frontend, Docker, scripts
+2. **AI chat** — DONE (KAM-2): `/api/chat` endpoint, ChatPanel component, LiteLLM/Cerebras
+3. **Kaart** — Leaflet kaart met OSM tiles, centreer op Frankrijk (MapPanel aanwezig, placeholder)
+4. **Overpass hook** — Fetch campings in huidige kaartview
+5. **Pins op kaart** — Campings als markers, klikbaar
+6. **Lijst rechts** — Zelfde data als kaartpins, gesorteerd op afstand (CampingList aanwezig, placeholder)
+7. **Filters** — Faciliteiten, type, prijs toggles
+8. **Detail overlay** — Bij klik op camping: naam, tags, Eurocampings link
+9. **Weer widget** — Open-Meteo per geselecteerde camping
+10. **Favorieten** — Hart-icoon + opslag
+11. **Deploy**
 
 ---
 

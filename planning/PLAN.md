@@ -270,6 +270,11 @@ to be determined
 
 ## 8. API Endpoints
 
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/health` | Health check, returns `{"status": "ok"}` |
+| POST | `/api/chat` | LLM chat — body: `{"messages": [{role, content}]}`, returns `ChatResponse` |
+
 ---
 
 ## 9. LLM Integration
@@ -282,13 +287,18 @@ There is an OPENROUTER_API_KEY in the .env file in the project root.
 
 When the user sends a chat message, the backend:
 
-to be determined
+1. Prepends the kampeerhub system prompt (Dutch, camping-focused assistant)
+2. Calls LiteLLM → OpenRouter → Cerebras (`openrouter/openai/gpt-oss-120b`, `reasoning_effort="low"`)
+3. Parses the structured JSON response into `ChatResponse`
+4. Returns `ChatResponse` to the frontend
 
 ### Structured Output Schema
 
-The LLM is instructed to respond with JSON matching this schema:
-
-to be determined
+```python
+class ChatResponse(BaseModel):
+    message: str                                               # text shown in chat
+    action: Literal["none", "search", "set_preference"] = "none"
+```
 
 
 ### Auto-Execution
@@ -318,9 +328,28 @@ When `LLM_MOCK=true`, the backend returns deterministic mock responses instead o
 
 ### Layout
 
-The frontend is a single-page application with a dense, terminal-inspired layout. The specific component architecture and layout system is up to the Frontend Engineer, but the UI should include these elements:
+The frontend is a single-page application with a dense, terminal-inspired layout.
 
-to be determinede
+```
+┌──────────────────────────────────────────────────────┐
+│  kampeerhub  camping zoeker                    ● (status) │
+├────────────────────────┬─────────────────────────────┤
+│                        │  N campings gevonden         │
+│   LEAFLET KAART        │  ┌───────────────────────┐  │
+│   (Frankijk, zoom 6)   │  │ Camping naam          │  │
+│                        │  │ tags  afstand  prijs  │  │
+│                        │  └───────────────────────┘  │
+│                        ├─────────────────────────────┤
+│                        │  AI ASSISTENT               │
+│                        │  [chat messages]            │
+│                        │  [input] [Stuur]            │
+└────────────────────────┴─────────────────────────────┘
+```
+
+**Components:**
+- `MapPanel` — Leaflet kaart, gecentreerd op Frankrijk (46.5, 2.5), zoom 6
+- `CampingList` — gescrold lijstje met campingkaarten (naam, tags, prijs, afstand)
+- `ChatPanel` — AI chat interface, h-72, paarse stuur-knop
 
 ### Technical Notes
 
