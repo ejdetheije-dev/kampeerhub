@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_atlassian_atlassian__getAccessibleAtlassianResources",
+      "mcp__plugin_atlassian_atlassian__getJiraIssue",
+      "Bash(mkdir:*)",
+      "Bash(cd:*)",
+      "Bash(npm run:*)",
+      "Bash(cat:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(docker:*)",
+      "mcp__plugin_atlassian_atlassian__getTransitionsForJiraIssue",
+      "mcp__plugin_atlassian_atlassian__transitionJiraIssue"
+    ]
+  }
+}
