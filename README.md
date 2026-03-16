@@ -1,3 +1,4 @@
-# Boilerplate — project readme
-contains information about the project
+kampeerhub
+
+Dit project gaat een camping selecteer en boek platform bouwen
 
