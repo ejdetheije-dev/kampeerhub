@@ -13,7 +13,8 @@
       "Bash(git push:*)",
       "Bash(docker:*)",
       "mcp__plugin_atlassian_atlassian__getTransitionsForJiraIssue",
-      "mcp__plugin_atlassian_atlassian__transitionJiraIssue"
+      "mcp__plugin_atlassian_atlassian__transitionJiraIssue",
+      "Bash(curl:*)"
     ]
   }
 }
