@@ -1,0 +1,12 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - kampeerhub-data:/app/database
+    env_file:
+      - .env
+
+volumes:
+  kampeerhub-data:
