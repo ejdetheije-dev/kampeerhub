@@ -5,11 +5,14 @@ import MapPanel from "@/components/MapPanel";
 import CampingList from "@/components/CampingList";
 import ChatPanel from "@/components/ChatPanel";
 import { useOverpass } from "@/hooks/useOverpass";
-import type { Bounds } from "@/types/camping";
+import type { Bounds, Camping } from "@/types/camping";
 
 export default function Home() {
   const [bounds, setBounds] = useState<Bounds | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const { campings, loading, error, tooFarOut } = useOverpass(bounds);
+
+  const handleSelectCamping = (camping: Camping) => setSelectedId(camping.id);
 
   return (
     <div className="flex flex-col h-screen bg-[#0d1117] text-gray-100">
@@ -23,10 +26,22 @@ export default function Home() {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        <MapPanel onBoundsChange={setBounds} />
+        <MapPanel
+          onBoundsChange={setBounds}
+          campings={campings}
+          selectedId={selectedId}
+          onSelectCamping={handleSelectCamping}
+        />
 
         <div className="w-96 flex flex-col border-l border-gray-800 shrink-0 overflow-hidden">
-          <CampingList campings={campings} loading={loading} error={error} tooFarOut={tooFarOut} />
+          <CampingList
+            campings={campings}
+            loading={loading}
+            error={error}
+            tooFarOut={tooFarOut}
+            selectedId={selectedId}
+            onSelect={handleSelectCamping}
+          />
           <ChatPanel />
         </div>
       </div>
