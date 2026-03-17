@@ -2,21 +2,26 @@
 
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef } from "react";
+import type { Bounds } from "@/types/camping";
 
-export default function MapPanel() {
+interface MapPanelProps {
+  onBoundsChange?: (bounds: Bounds) => void;
+}
+
+export default function MapPanel({ onBoundsChange }: MapPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<unknown>(null);
+  const onBoundsChangeRef = useRef(onBoundsChange);
+  onBoundsChangeRef.current = onBoundsChange;
 
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return;
 
     let cancelled = false;
 
-    // Dynamically import Leaflet to avoid SSR issues
     import("leaflet").then((L) => {
       if (cancelled || !containerRef.current) return;
 
-      // Fix default marker icon using local copies (avoids CDN dependency)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (L.Icon.Default.prototype as any)._getIconUrl;
       L.Icon.Default.mergeOptions({
@@ -31,6 +36,22 @@ export default function MapPanel() {
         attribution: "&copy; OpenStreetMap contributors",
         maxZoom: 19,
       }).addTo(map);
+
+      const emitBounds = () => {
+        const b = map.getBounds();
+        onBoundsChangeRef.current?.({
+          south: b.getSouth(),
+          west: b.getWest(),
+          north: b.getNorth(),
+          east: b.getEast(),
+        });
+      };
+
+      map.on("moveend", emitBounds);
+      map.on("zoomend", emitBounds);
+      // Emit initial bounds once tiles have loaded
+      map.once("load", emitBounds);
+      setTimeout(emitBounds, 300);
 
       mapRef.current = map;
     });
