@@ -14,14 +14,17 @@ interface CampingListProps {
   campings: Camping[];
   loading: boolean;
   error: string | null;
+  tooFarOut: boolean;
 }
 
-export default function CampingList({ campings, loading, error }: CampingListProps) {
+export default function CampingList({ campings, loading, error, tooFarOut }: CampingListProps) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-800 flex items-center gap-2">
         <span className="text-sm text-gray-400">
-          {loading ? (
+          {tooFarOut ? (
+            <span className="text-gray-500">zoom in om campings te laden</span>
+          ) : loading ? (
             <span className="text-gray-500">laden...</span>
           ) : error ? (
             <span className="text-red-400">{error}</span>

@@ -9,7 +9,7 @@ import type { Bounds } from "@/types/camping";
 
 export default function Home() {
   const [bounds, setBounds] = useState<Bounds | null>(null);
-  const { campings, loading, error } = useOverpass(bounds);
+  const { campings, loading, error, tooFarOut } = useOverpass(bounds);
 
   return (
     <div className="flex flex-col h-screen bg-[#0d1117] text-gray-100">
@@ -26,7 +26,7 @@ export default function Home() {
 
         {/* Right column */}
         <div className="w-96 flex flex-col border-l border-gray-800 shrink-0 overflow-hidden">
-          <CampingList campings={campings} loading={loading} error={error} />
+          <CampingList campings={campings} loading={loading} error={error} tooFarOut={tooFarOut} />
           <ChatPanel />
         </div>
       </div>
