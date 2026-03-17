@@ -44,7 +44,6 @@ export default function MapPanel({ onBoundsChange }: MapPanelProps) {
           west: b.getWest(),
           north: b.getNorth(),
           east: b.getEast(),
-          zoom: map.getZoom(),
         });
       };
 
