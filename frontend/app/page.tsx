@@ -5,11 +5,10 @@ import MapPanel from "@/components/MapPanel";
 import CampingList from "@/components/CampingList";
 import ChatPanel from "@/components/ChatPanel";
 import { useOverpass } from "@/hooks/useOverpass";
-import type { Bounds, Camping } from "@/types/camping";
+import type { Bounds } from "@/types/camping";
 
 export default function Home() {
   const [bounds, setBounds] = useState<Bounds | null>(null);
-  const [selectedCamping, setSelectedCamping] = useState<string | null>(null);
   const { campings, loading, error, tooFarOut } = useOverpass(bounds);
 
   return (
@@ -23,11 +22,7 @@ export default function Home() {
 
       {/* Split screen */}
       <div className="flex flex-1 overflow-hidden">
-        <MapPanel
-          campings={campings}
-          onBoundsChange={setBounds}
-          onSelectCamping={(c: Camping) => setSelectedCamping(c.id)}
-        />
+        <MapPanel onBoundsChange={setBounds} />
 
         {/* Right column */}
         <div className="w-96 flex flex-col border-l border-gray-800 shrink-0 overflow-hidden">
