@@ -39,3 +39,4 @@ Thumbs.db
 
 # Docker
 backend/static/
+.claude/settings.local.json
