@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "copy-leaflet": "node -e \"const fs=require('fs');fs.mkdirSync('public/leaflet',{recursive:true});['marker-icon.png','marker-icon-2x.png','marker-shadow.png'].forEach(f=>fs.copyFileSync('node_modules/leaflet/dist/images/'+f,'public/leaflet/'+f))\"",
+    "predev": "npm run copy-leaflet",
+    "prebuild": "npm run copy-leaflet",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
@@ -13,8 +16,7 @@
     "leaflet": "^1.9.4",
     "next": "16.1.6",
     "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "react-leaflet": "^5.0.0"
+    "react-dom": "19.2.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

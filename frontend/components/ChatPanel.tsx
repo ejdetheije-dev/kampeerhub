@@ -35,6 +35,15 @@ export default function ChatPanel() {
         body: JSON.stringify({ messages: updated }),
       });
       const data = await res.json();
+      if (!res.ok) {
+        const detail = data.detail || "Serverfout. Probeer opnieuw.";
+        setMessages((prev) => [...prev, { role: "assistant", content: detail }]);
+        return;
+      }
+      if (data.action && data.action !== "none") {
+        // Auto-execute action returned by the LLM
+        console.log("[kampeerhub] action:", data.action);
+      }
       setMessages((prev) => [...prev, { role: "assistant", content: data.message }]);
     } catch {
       setMessages((prev) => [...prev, { role: "assistant", content: "Verbindingsfout. Probeer opnieuw." }]);
