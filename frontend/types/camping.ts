@@ -3,6 +3,7 @@ export interface Bounds {
   west: number;
   north: number;
   east: number;
+  zoom: number;
 }
 
 export interface Camping {
