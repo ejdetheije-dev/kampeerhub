@@ -59,7 +59,7 @@ export default function MapPanel({ campings = [], onBoundsChange, onSelectCampin
 
       map.on("moveend", emitBounds);
       map.on("zoomend", emitBounds);
-      setTimeout(emitBounds, 300);
+      map.whenReady(emitBounds);
 
       leafletRef.current = L;
       markersLayerRef.current = markersLayer;

@@ -5,6 +5,10 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from litellm import completion

@@ -7,7 +7,11 @@ interface Message {
   content: string;
 }
 
-export default function ChatPanel() {
+interface ChatPanelProps {
+  onAction?: (action: string) => void;
+}
+
+export default function ChatPanel({ onAction }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     { role: "assistant", content: "Hallo! Ik ben kampeerhub. Waar wil je naartoe kamperen?" },
   ]);
@@ -41,8 +45,7 @@ export default function ChatPanel() {
         return;
       }
       if (data.action && data.action !== "none") {
-        // Auto-execute action returned by the LLM
-        console.log("[kampeerhub] action:", data.action);
+        onAction?.(data.action);
       }
       setMessages((prev) => [...prev, { role: "assistant", content: data.message }]);
     } catch {
@@ -95,6 +98,7 @@ export default function ChatPanel() {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKeyDown}
           disabled={loading}
+          maxLength={4000}
         />
         <button
           onClick={send}

@@ -9,10 +9,12 @@ const SHIFT_THRESHOLD = 0.3;
 const MIN_ZOOM = 9;
 const COOLDOWN_MS = 30_000;
 const RETRY_MS = 35_000;
+const MAX_CACHE_SIZE = 5_000;
 
 function hasSignificantShift(prev: Bounds, next: Bounds): boolean {
   const latSpan = next.north - next.south;
   const lngSpan = next.east - next.west;
+  if (latSpan === 0 || lngSpan === 0) return true;
   const latShift = Math.abs(((prev.north + prev.south) - (next.north + next.south)) / 2) / latSpan;
   const lngShift = Math.abs(((prev.east + prev.west) - (next.east + next.west)) / 2) / lngSpan;
   return latShift > SHIFT_THRESHOLD || lngShift > SHIFT_THRESHOLD;
@@ -83,9 +85,11 @@ export function useOverpass(bounds: Bounds | null) {
   const cacheRef = useRef<Map<string, Camping>>(new Map());
   const cachedBoundsRef = useRef<Bounds | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastFetchRef = useRef<number>(0);
   const pendingBoundsRef = useRef<Bounds | null>(null);
+  const mountedRef = useRef(true);
 
   const showFromCache = useCallback((b: Bounds) => {
     const visible = Array.from(cacheRef.current.values()).filter((c) => inBounds(c, b));
@@ -118,7 +122,8 @@ export function useOverpass(bounds: Bounds | null) {
       if (!res.ok) throw new Error(`Overpass fout: ${res.status}`);
       const data: OverpassResponse = await res.json();
 
-      // Merge into cache
+      // Merge into cache; evict oldest entries when limit is reached
+      if (cacheRef.current.size > MAX_CACHE_SIZE) cacheRef.current.clear();
       for (const c of parseCampings(data)) {
         cacheRef.current.set(c.id, c);
       }
@@ -159,8 +164,8 @@ export function useOverpass(bounds: Bounds | null) {
 
       const elapsed = Date.now() - lastFetchRef.current;
       if (elapsed < COOLDOWN_MS) {
-        debounceRef.current = setTimeout(() => {
-          if (pendingBoundsRef.current) doFetch(pendingBoundsRef.current);
+        cooldownRef.current = setTimeout(() => {
+          if (mountedRef.current && pendingBoundsRef.current) doFetch(pendingBoundsRef.current);
         }, COOLDOWN_MS - elapsed);
         return;
       }
@@ -174,7 +179,11 @@ export function useOverpass(bounds: Bounds | null) {
   }, [bounds, doFetch, showFromCache]);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (cooldownRef.current) clearTimeout(cooldownRef.current);
       if (retryRef.current) clearTimeout(retryRef.current);
     };
   }, []);

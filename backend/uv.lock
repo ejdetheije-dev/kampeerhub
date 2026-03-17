@@ -157,6 +157,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "litellm" },
     { name = "pydantic" },
+    { name = "python-dotenv" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -165,6 +166,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.135.1" },
     { name = "litellm", specifier = ">=1.82.2" },
     { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.42.0" },
 ]
 

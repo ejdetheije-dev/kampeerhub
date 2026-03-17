@@ -32,7 +32,7 @@ export default function Home() {
         {/* Right column */}
         <div className="w-96 flex flex-col border-l border-gray-800 shrink-0 overflow-hidden">
           <CampingList campings={campings} loading={loading} error={error} tooFarOut={tooFarOut} />
-          <ChatPanel />
+          <ChatPanel onAction={(action) => console.info("[kampeerhub] action:", action)} />
         </div>
       </div>
     </div>

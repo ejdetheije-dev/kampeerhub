@@ -44,10 +44,12 @@ export default function CampingList({ campings, loading, error, tooFarOut }: Cam
 
           const eurocampingsUrl = `https://www.eurocampings.nl/zoeken/?q=${encodeURIComponent(c.name)}`;
 
+          const priceLabel = c.tags.charge ?? (c.tags.fee === "yes" ? "betaald" : null);
+
           return (
             <div
               key={c.id}
-              className="px-4 py-3 border-b border-gray-800 hover:bg-gray-800/40 cursor-pointer transition-colors"
+              className="px-4 py-3 border-b border-gray-800 hover:bg-gray-800/40 transition-colors"
             >
               <div className="font-medium text-sm text-gray-100 mb-1">{c.name}</div>
               {activeTags.length > 0 && (
@@ -61,15 +63,19 @@ export default function CampingList({ campings, loading, error, tooFarOut }: Cam
               )}
               <div className="flex justify-between items-center text-xs text-gray-500">
                 <span>{c.lat.toFixed(3)}, {c.lon.toFixed(3)}</span>
-                <a
-                  href={eurocampingsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[#209dd7] hover:underline"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  Eurocampings
-                </a>
+                <div className="flex items-center gap-2">
+                  {priceLabel && (
+                    <span className="text-[#ecad0a]">{priceLabel}</span>
+                  )}
+                  <a
+                    href={eurocampingsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#209dd7] hover:underline"
+                  >
+                    Eurocampings
+                  </a>
+                </div>
               </div>
             </div>
           );
