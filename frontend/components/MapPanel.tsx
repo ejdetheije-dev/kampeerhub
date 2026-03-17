@@ -2,6 +2,7 @@
 
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef } from "react";
+import type { Map as LeafletMap } from "leaflet";
 import type { Bounds } from "@/types/camping";
 
 interface MapPanelProps {
@@ -10,7 +11,7 @@ interface MapPanelProps {
 
 export default function MapPanel({ onBoundsChange }: MapPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<unknown>(null);
+  const mapRef = useRef<LeafletMap | null>(null);
   const onBoundsChangeRef = useRef(onBoundsChange);
   onBoundsChangeRef.current = onBoundsChange;
 
@@ -50,8 +51,7 @@ export default function MapPanel({ onBoundsChange }: MapPanelProps) {
 
       map.on("moveend", emitBounds);
       map.on("zoomend", emitBounds);
-      // Emit initial bounds once tiles have loaded
-      map.once("load", emitBounds);
+      // Single initial emit after layout settles
       setTimeout(emitBounds, 300);
 
       mapRef.current = map;
@@ -60,7 +60,7 @@ export default function MapPanel({ onBoundsChange }: MapPanelProps) {
     return () => {
       cancelled = true;
       if (mapRef.current) {
-        (mapRef.current as { remove: () => void }).remove();
+        mapRef.current.remove();
         mapRef.current = null;
       }
     };

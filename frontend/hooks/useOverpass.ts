@@ -53,6 +53,7 @@ export function useOverpass(bounds: Bounds | null) {
       if (data.fetching) {
         pollRef.current = setTimeout(() => {
           if (mountedRef.current) load(b);
+          // else: component unmounted — do nothing
         }, POLL_MS);
       }
     } catch (err) {

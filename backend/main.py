@@ -1,10 +1,11 @@
 """Kampeerhub FastAPI backend."""
 import asyncio
 import json
+import logging
 import math
 import os
 import sqlite3
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, closing
 from pathlib import Path
 from typing import Literal
 
@@ -18,9 +19,13 @@ from pydantic import BaseModel, Field
 
 load_dotenv()
 
-DB_PATH = Path("/app/database/kampeerhub.db")
+logger = logging.getLogger("kampeerhub")
+
+DB_PATH = Path(os.getenv("DATABASE_PATH", "/app/database/kampeerhub.db"))
 STATIC_DIR = Path(__file__).parent / "static"
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+TILE_TTL_SECONDS = 7 * 24 * 3600  # 7 days
+MAX_TILES = 16
 
 MODEL = "openrouter/openai/gpt-oss-120b"
 EXTRA_BODY = {"provider": {"order": ["cerebras"]}}
@@ -37,6 +42,9 @@ Antwoord altijd in het Nederlands."""
 
 MOCK_RESPONSE = '{"message": "Dit is een testantwoord. LLM_MOCK is ingeschakeld.", "action": "none"}'
 
+# Read once at startup (SEC-3)
+_openrouter_api_key: str | None = None
+
 # One Overpass request at a time; set tracks in-progress tile keys
 _overpass_lock = asyncio.Lock()
 _fetching_tiles: set[str] = set()
@@ -46,74 +54,73 @@ _fetching_tiles: set[str] = set()
 
 def init_db() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(DB_PATH)
-    con.execute("PRAGMA journal_mode=WAL")
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS campings (
-            id   TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            lat  REAL NOT NULL,
-            lon  REAL NOT NULL,
-            tags TEXT NOT NULL
-        )
-    """)
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS fetched_tiles (
-            tile_key   TEXT PRIMARY KEY,
-            fetched_at INTEGER NOT NULL
-        )
-    """)
-    con.execute("CREATE INDEX IF NOT EXISTS idx_campings_bbox ON campings(lat, lon)")
-    con.commit()
-    con.close()
+    with closing(sqlite3.connect(DB_PATH)) as con:
+        con.execute("PRAGMA journal_mode=WAL")
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS campings (
+                id   TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                lat  REAL NOT NULL,
+                lon  REAL NOT NULL,
+                tags TEXT NOT NULL
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS fetched_tiles (
+                tile_key   TEXT PRIMARY KEY,
+                fetched_at INTEGER NOT NULL
+            )
+        """)
+        con.execute("CREATE INDEX IF NOT EXISTS idx_campings_bbox ON campings(lat, lon)")
+        con.commit()
 
 
 def is_tile_cached(tile_key: str) -> bool:
-    con = sqlite3.connect(DB_PATH)
-    row = con.execute("SELECT 1 FROM fetched_tiles WHERE tile_key = ?", (tile_key,)).fetchone()
-    con.close()
+    with closing(sqlite3.connect(DB_PATH)) as con:
+        row = con.execute(
+            "SELECT 1 FROM fetched_tiles WHERE tile_key = ? AND fetched_at > strftime('%s','now') - ?",
+            (tile_key, TILE_TTL_SECONDS),
+        ).fetchone()
     return row is not None
 
 
 def store_tile(elements: list, tile_key: str) -> None:
-    con = sqlite3.connect(DB_PATH)
-    for el in elements:
-        lat = el.get("lat") or (el.get("center") or {}).get("lat")
-        lon = el.get("lon") or (el.get("center") or {}).get("lon")
-        if lat is None or lon is None:
-            continue
-        t = el.get("tags") or {}
-        cap = t.get("capacity", "")
-        tags = {
-            "dog":         t.get("dog") == "yes",
-            "wifi":        t.get("internet_access") in ("wlan", "yes"),
-            "pool":        t.get("swimming_pool") == "yes",
-            "electricity": t.get("electricity") == "yes",
-            "nudism":      t.get("nudism") in ("yes", "designated"),
-            "capacity":    int(cap) if cap.isdigit() else None,
-            "fee":         t.get("fee"),
-            "charge":      t.get("charge"),
-        }
+    with closing(sqlite3.connect(DB_PATH)) as con:
+        for el in elements:
+            lat = el.get("lat") or (el.get("center") or {}).get("lat")
+            lon = el.get("lon") or (el.get("center") or {}).get("lon")
+            if lat is None or lon is None:
+                continue
+            t = el.get("tags") or {}
+            cap = t.get("capacity", "")
+            tags = {
+                "dog":         t.get("dog") == "yes",
+                "wifi":        t.get("internet_access") in ("wlan", "yes"),
+                "pool":        t.get("swimming_pool") == "yes",
+                "electricity": t.get("electricity") == "yes",
+                "nudism":      t.get("nudism") in ("yes", "designated"),
+                "capacity":    int(cap) if cap.isdigit() else None,
+                "fee":         t.get("fee"),
+                "charge":      t.get("charge"),
+            }
+            con.execute(
+                "INSERT OR REPLACE INTO campings (id, name, lat, lon, tags) VALUES (?, ?, ?, ?, ?)",
+                (f"{el['type']}-{el['id']}", t.get("name") or "Camping (naamloos)", lat, lon, json.dumps(tags)),
+            )
         con.execute(
-            "INSERT OR REPLACE INTO campings (id, name, lat, lon, tags) VALUES (?, ?, ?, ?, ?)",
-            (f"{el['type']}-{el['id']}", t.get("name") or "Camping (naamloos)", lat, lon, json.dumps(tags)),
+            "INSERT OR REPLACE INTO fetched_tiles (tile_key, fetched_at) VALUES (?, strftime('%s','now'))",
+            (tile_key,),
         )
-    con.execute(
-        "INSERT OR REPLACE INTO fetched_tiles (tile_key, fetched_at) VALUES (?, strftime('%s','now'))",
-        (tile_key,),
-    )
-    con.commit()
-    con.close()
+        con.commit()
 
 
 def get_campings_in_bbox(south: float, west: float, north: float, east: float) -> list[dict]:
-    con = sqlite3.connect(DB_PATH)
-    rows = con.execute(
-        "SELECT id, name, lat, lon, tags FROM campings "
-        "WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?",
-        (south, north, west, east),
-    ).fetchall()
-    con.close()
+    with closing(sqlite3.connect(DB_PATH)) as con:
+        rows = con.execute(
+            "SELECT id, name, lat, lon, tags FROM campings "
+            "WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?",
+            (south, north, west, east),
+        ).fetchall()
     return [{"id": r[0], "name": r[1], "lat": r[2], "lon": r[3], "tags": json.loads(r[4])} for r in rows]
 
 
@@ -135,9 +142,6 @@ def tile_keys(south: float, west: float, north: float, east: float) -> list[str]
 async def fetch_tile(tile_key: str) -> None:
     """Fetch one 1°×1° tile from Overpass and persist to SQLite.
     Serialized via _overpass_lock so only one HTTP request runs at a time."""
-    if tile_key in _fetching_tiles:
-        return
-    _fetching_tiles.add(tile_key)
     try:
         lat, lon = map(int, tile_key.split("_"))
         query = (
@@ -153,12 +157,13 @@ async def fetch_tile(tile_key: str) -> None:
             async with httpx.AsyncClient(timeout=40.0) as client:
                 res = await client.post(OVERPASS_URL, data={"data": query})
             if res.status_code == 429:
+                logger.warning("Overpass rate limit hit for tile %s", tile_key)
                 return   # leave tile uncached; next poll will retry
             res.raise_for_status()
             elements = res.json().get("elements", [])
             await asyncio.to_thread(store_tile, elements, tile_key)
     except Exception:
-        pass   # tile stays uncached; next request retries
+        logger.exception("Failed to fetch tile %s", tile_key)
     finally:
         _fetching_tiles.discard(tile_key)
 
@@ -167,9 +172,11 @@ async def fetch_tile(tile_key: str) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _openrouter_api_key
     init_db()
-    if not os.getenv("OPENROUTER_API_KEY") and os.getenv("LLM_MOCK", "").lower() != "true":
-        print("WARNING: OPENROUTER_API_KEY is not set and LLM_MOCK is not enabled")
+    _openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+    if not _openrouter_api_key and os.getenv("LLM_MOCK", "").lower() != "true":
+        logger.warning("OPENROUTER_API_KEY is not set and LLM_MOCK is not enabled")
     yield
 
 
@@ -179,13 +186,20 @@ app = FastAPI(title="kampeerhub", lifespan=lifespan)
 @app.get("/api/campings")
 async def campings_endpoint(south: float, west: float, north: float, east: float) -> dict:
     """Return cached campings immediately; start background fetch for missing tiles."""
+    if not (-90 <= south < north <= 90) or not (-180 <= west <= 180) or not (-180 <= east <= 180):
+        raise HTTPException(status_code=422, detail="Ongeldige bounding box parameters")
+
     tiles = tile_keys(south, west, north, east)
+    if len(tiles) > MAX_TILES:
+        return {"campings": [], "fetching": False}
+
     missing = [t for t in tiles if not is_tile_cached(t) and t not in _fetching_tiles]
     for tile in missing:
+        _fetching_tiles.add(tile)  # Mark in-flight before task starts — prevents race condition
         asyncio.create_task(fetch_tile(tile))
 
     result = await asyncio.to_thread(get_campings_in_bbox, south, west, north, east)
-    fetching = bool(missing) or any(t in _fetching_tiles for t in tiles)
+    fetching = any(t in _fetching_tiles for t in tiles)
     return {"campings": result, "fetching": fetching}
 
 
@@ -206,7 +220,7 @@ class ChatResponse(BaseModel):
 
 
 @app.post("/api/chat")
-def chat(req: ChatRequest) -> ChatResponse:
+async def chat(req: ChatRequest) -> ChatResponse:
     """Call the LLM and return a structured response."""
     if os.getenv("LLM_MOCK", "").lower() == "true":
         return ChatResponse.model_validate_json(MOCK_RESPONSE)
@@ -215,13 +229,14 @@ def chat(req: ChatRequest) -> ChatResponse:
     messages += [{"role": m.role, "content": m.content} for m in req.messages]
 
     try:
-        response = completion(
+        response = await asyncio.to_thread(
+            completion,
             model=MODEL,
             messages=messages,
             response_format=ChatResponse,
             reasoning_effort="low",
             extra_body=EXTRA_BODY,
-            api_key=os.getenv("OPENROUTER_API_KEY"),
+            api_key=_openrouter_api_key,
         )
         return ChatResponse.model_validate_json(response.choices[0].message.content)
     except AuthenticationError:
@@ -230,8 +245,9 @@ def chat(req: ChatRequest) -> ChatResponse:
         raise HTTPException(status_code=429, detail="Te veel verzoeken. Probeer later opnieuw.")
     except ServiceUnavailableError:
         raise HTTPException(status_code=503, detail="LLM service tijdelijk niet beschikbaar.")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"LLM fout: {e}")
+    except Exception:
+        logger.exception("LLM request failed")
+        raise HTTPException(status_code=500, detail="LLM fout. Probeer opnieuw.")
 
 
 @app.get("/api/health")
