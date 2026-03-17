@@ -1,6 +1,6 @@
 # plan — kampeerhub
 
-## Project Status (2026-03-17)
+## Project Status (2026-03-17, updated after KAM-5)
 
 | Step | Status | Notes |
 |---|---|---|
@@ -9,7 +9,7 @@
 | Bug fixes & cleanup | Done | LLM_MOCK, error handling, MapPanel StrictMode, local Leaflet icons, input limits |
 | KAM-3 Leaflet map | Done | Map renders with OSM tiles, centered on France (46.5, 2.5) zoom 6 |
 | KAM-4 Overpass hook | Done | Backend SQLite tile cache; frontend polls `/api/campings`; debounce 800ms, 30% shift threshold, 3s poll interval |
-| KAM-5 Pins on map | Not started | |
+| KAM-5 Pins on map | Done | divIcon circle markers; click pin or list item to select; yellow highlight for selected |
 | KAM-6 CampingList (real data) | Done | Live OSM data, tag badges, Eurocampings deeplinks |
 | KAM-7 Filters | Not started | |
 | KAM-8 Detail overlay | Not started | |

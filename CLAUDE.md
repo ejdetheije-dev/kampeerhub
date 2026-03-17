@@ -45,7 +45,7 @@ Deeplink formaat: https://www.eurocampings.nl/zoeken/?q={naam}
 4. **Kaart** — DONE (KAM-3/KAM-11): Leaflet kaart met OSM tiles, gecentreerd op Frankrijk (46.5, 2.5) zoom 6
 5. **Overpass hook** — DONE (KAM-4): backend SQLite tile cache, `/api/campings` endpoint, frontend polling
 6. **CampingList (live data)** — DONE (KAM-6): live OSM data, tag badges, Eurocampings deeplinks
-7. **Pins op kaart** — Campings als markers, klikbaar
+7. **Pins op kaart** — DONE (KAM-5): divIcon cirkels op kaart, klikbaar; selectie gedeeld tussen kaart en lijst
 8. **Filters** — Faciliteiten, type, prijs toggles
 9. **Detail overlay** — Bij klik op camping: naam, tags, Eurocampings link
 10. **Weer widget** — Open-Meteo per geselecteerde camping
