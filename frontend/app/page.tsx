@@ -16,7 +16,10 @@ export default function Home() {
       <header className="flex items-center px-4 h-12 border-b border-gray-800 shrink-0">
         <span className="text-[#ecad0a] font-bold text-lg tracking-wide">kampeerhub</span>
         <span className="ml-3 text-gray-400 text-sm">camping zoeker</span>
-        <span className="ml-auto w-2 h-2 rounded-full bg-green-400" title="verbonden" />
+        <span
+          className={`ml-auto w-2 h-2 rounded-full ${error ? "bg-red-400" : loading ? "bg-yellow-400" : "bg-green-400"}`}
+          title={error ? "fout" : loading ? "laden..." : "verbonden"}
+        />
       </header>
 
       <div className="flex flex-1 overflow-hidden">
