@@ -15,9 +15,11 @@ interface CampingListProps {
   loading: boolean;
   error: string | null;
   tooFarOut: boolean;
+  selectedId?: string | null;
+  onSelect?: (camping: Camping) => void;
 }
 
-export default function CampingList({ campings, loading, error, tooFarOut }: CampingListProps) {
+export default function CampingList({ campings, loading, error, tooFarOut, selectedId, onSelect }: CampingListProps) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-800 flex items-center gap-2">
@@ -51,10 +53,12 @@ export default function CampingList({ campings, loading, error, tooFarOut }: Cam
 
           const eurocampingsUrl = `https://www.eurocampings.nl/zoeken/?q=${encodeURIComponent(c.name)}`;
 
+          const isSelected = c.id === selectedId;
           return (
             <div
               key={c.id}
-              className="px-4 py-3 border-b border-gray-800 hover:bg-gray-800/40 transition-colors"
+              onClick={() => onSelect?.(c)}
+              className={`px-4 py-3 border-b border-gray-800 cursor-pointer transition-colors ${isSelected ? "bg-gray-700/60 border-l-2 border-l-[#ecad0a]" : "hover:bg-gray-800/40"}`}
             >
               <div className="font-medium text-sm text-gray-100 mb-1">{c.name}</div>
               {activeTags.length > 0 && (
