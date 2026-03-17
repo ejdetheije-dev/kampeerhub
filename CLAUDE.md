@@ -36,15 +36,16 @@ Deeplink formaat: https://www.eurocampings.nl/zoeken/?q={naam}
 
 1. **Basis scaffold** — DONE (KAM-1): FastAPI backend, Next.js frontend, Docker, scripts
 2. **AI chat** — DONE (KAM-2): `/api/chat` endpoint, ChatPanel component, LiteLLM/Cerebras
-3. **Kaart** — Leaflet kaart met OSM tiles, centreer op Frankrijk (MapPanel aanwezig, placeholder)
-4. **Overpass hook** — Fetch campings in huidige kaartview
-5. **Pins op kaart** — Campings als markers, klikbaar
-6. **Lijst rechts** — Zelfde data als kaartpins, gesorteerd op afstand (CampingList aanwezig, placeholder)
-7. **Filters** — Faciliteiten, type, prijs toggles
-8. **Detail overlay** — Bij klik op camping: naam, tags, Eurocampings link
-9. **Weer widget** — Open-Meteo per geselecteerde camping
-10. **Favorieten** — Hart-icoon + opslag
-11. **Deploy**
+3. **Bug fixes & cleanup** — DONE: LLM_MOCK, error handling, MapPanel StrictMode fix, local Leaflet icons, input limits, removed unused deps
+4. **Kaart** — Leaflet kaart met OSM tiles, centreer op Frankrijk (MapPanel aanwezig, placeholder)
+5. **Overpass hook** — Fetch campings in huidige kaartview
+6. **Pins op kaart** — Campings als markers, klikbaar
+7. **Lijst rechts** — Zelfde data als kaartpins, gesorteerd op afstand (CampingList aanwezig, placeholder)
+8. **Filters** — Faciliteiten, type, prijs toggles
+9. **Detail overlay** — Bij klik op camping: naam, tags, Eurocampings link
+10. **Weer widget** — Open-Meteo per geselecteerde camping
+11. **Favorieten** — Hart-icoon + opslag
+12. **Deploy**
 
 ---
 

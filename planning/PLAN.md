@@ -1,5 +1,26 @@
 # plan — kampeerhub
 
+## Project Status (2026-03-17)
+
+| Step | Status | Notes |
+|---|---|---|
+| KAM-1 scaffold | Done | FastAPI, Next.js static export, Docker, scripts |
+| KAM-2 AI chat | Done | `/api/chat`, ChatPanel, LiteLLM/Cerebras |
+| Bug fixes & cleanup | Done | LLM_MOCK, error handling, MapPanel StrictMode, local Leaflet icons, input limits |
+| KAM-3 Leaflet map | In progress | Map renders with OSM tiles, no real campsite data yet |
+| KAM-4 Overpass hook | Not started | |
+| KAM-5 Pins on map | Not started | |
+| KAM-6 CampingList (real data) | Not started | Placeholder hardcoded data only |
+| KAM-7 Filters | Not started | |
+| KAM-8 Detail overlay | Not started | |
+| KAM-9 Weather widget | Not started | |
+| KAM-10 Favourites | Not started | |
+| KAM-11 Deploy | Not started | |
+| E2E tests | Not started | `test/` directory does not exist yet |
+| Backend unit tests | Not started | |
+
+---
+
 ## Project Specification
 
 ## 1. Vision
