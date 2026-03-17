@@ -8,7 +8,7 @@
 | KAM-2 AI chat | Done | `/api/chat`, ChatPanel, LiteLLM/Cerebras |
 | Bug fixes & cleanup | Done | LLM_MOCK, error handling, MapPanel StrictMode, local Leaflet icons, input limits |
 | KAM-3 Leaflet map | Done | Map renders with OSM tiles, centered on France (46.5, 2.5) zoom 6 |
-| KAM-4 Overpass hook | Done | `useOverpass` hook: debounce 1500ms, 30% shift threshold, 30s cooldown, in-memory cache, auto-retry on 429 |
+| KAM-4 Overpass hook | Done | Backend SQLite tile cache; frontend polls `/api/campings`; debounce 800ms, 30% shift threshold, 3s poll interval |
 | KAM-5 Pins on map | Not started | |
 | KAM-6 CampingList (real data) | Done | Live OSM data, tag badges, Eurocampings deeplinks |
 | KAM-7 Filters | Not started | |
