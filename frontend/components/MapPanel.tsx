@@ -10,18 +10,22 @@ export default function MapPanel() {
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return;
 
+    let cancelled = false;
+
     // Dynamically import Leaflet to avoid SSR issues
     import("leaflet").then((L) => {
-      // Fix default marker icon
+      if (cancelled || !containerRef.current) return;
+
+      // Fix default marker icon using local copies (avoids CDN dependency)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       delete (L.Icon.Default.prototype as any)._getIconUrl;
       L.Icon.Default.mergeOptions({
-        iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+        iconRetinaUrl: "/leaflet/marker-icon-2x.png",
+        iconUrl: "/leaflet/marker-icon.png",
+        shadowUrl: "/leaflet/marker-shadow.png",
       });
 
-      const map = L.map(containerRef.current!).setView([46.5, 2.5], 6);
+      const map = L.map(containerRef.current).setView([46.5, 2.5], 6);
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "&copy; OpenStreetMap contributors",
@@ -32,6 +36,7 @@ export default function MapPanel() {
     });
 
     return () => {
+      cancelled = true;
       if (mapRef.current) {
         (mapRef.current as { remove: () => void }).remove();
         mapRef.current = null;

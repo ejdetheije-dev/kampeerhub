@@ -5,10 +5,11 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from litellm import completion
-from pydantic import BaseModel
+from litellm.exceptions import AuthenticationError, RateLimitError, ServiceUnavailableError
+from pydantic import BaseModel, Field
 
 
 DB_PATH = Path("/app/database/kampeerhub.db")
@@ -27,6 +28,8 @@ Je helpt gebruikers met:
 Wees beknopt en data-gedreven. Stel gerichte vragen om de perfecte camping te vinden.
 Antwoord altijd in het Nederlands."""
 
+MOCK_RESPONSE = '{"message": "Dit is een testantwoord. LLM_MOCK is ingeschakeld.", "action": "none"}'
+
 
 def init_db():
     """Create database and tables if they don't exist."""
@@ -40,6 +43,8 @@ def init_db():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    if not os.getenv("OPENROUTER_API_KEY") and os.getenv("LLM_MOCK", "").lower() != "true":
+        print("WARNING: OPENROUTER_API_KEY is not set and LLM_MOCK is not enabled")
     yield
 
 
@@ -48,11 +53,11 @@ app = FastAPI(title="kampeerhub", lifespan=lifespan)
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]
-    content: str
+    content: str = Field(max_length=4000)
 
 
 class ChatRequest(BaseModel):
-    messages: list[ChatMessage]
+    messages: list[ChatMessage] = Field(max_length=50)
 
 
 class ChatResponse(BaseModel):
@@ -63,18 +68,30 @@ class ChatResponse(BaseModel):
 @app.post("/api/chat")
 def chat(req: ChatRequest) -> ChatResponse:
     """Call the LLM and return a structured response."""
+    if os.getenv("LLM_MOCK", "").lower() == "true":
+        return ChatResponse.model_validate_json(MOCK_RESPONSE)
+
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     messages += [{"role": m.role, "content": m.content} for m in req.messages]
 
-    response = completion(
-        model=MODEL,
-        messages=messages,
-        response_format=ChatResponse,
-        reasoning_effort="low",
-        extra_body=EXTRA_BODY,
-        api_key=os.getenv("OPENROUTER_API_KEY"),
-    )
-    return ChatResponse.model_validate_json(response.choices[0].message.content)
+    try:
+        response = completion(
+            model=MODEL,
+            messages=messages,
+            response_format=ChatResponse,
+            reasoning_effort="low",
+            extra_body=EXTRA_BODY,
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+        )
+        return ChatResponse.model_validate_json(response.choices[0].message.content)
+    except AuthenticationError:
+        raise HTTPException(status_code=401, detail="LLM authenticatie mislukt. Controleer de API sleutel.")
+    except RateLimitError:
+        raise HTTPException(status_code=429, detail="Te veel verzoeken. Probeer later opnieuw.")
+    except ServiceUnavailableError:
+        raise HTTPException(status_code=503, detail="LLM service tijdelijk niet beschikbaar.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"LLM fout: {e}")
 
 
 @app.get("/api/health")
