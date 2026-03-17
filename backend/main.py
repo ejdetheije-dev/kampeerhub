@@ -5,6 +5,7 @@ import logging
 import math
 import os
 import sqlite3
+import time
 from contextlib import asynccontextmanager, closing
 from pathlib import Path
 from typing import Literal
@@ -48,6 +49,8 @@ _openrouter_api_key: str | None = None
 # One Overpass request at a time; set tracks in-progress tile keys
 _overpass_lock = asyncio.Lock()
 _fetching_tiles: set[str] = set()
+_tile_retry_after: dict[str, float] = {}  # tile_key -> earliest retry timestamp after 429
+COOLDOWN_SECONDS = 60
 
 
 # --- Database ---
@@ -158,7 +161,8 @@ async def fetch_tile(tile_key: str) -> None:
                 res = await client.post(OVERPASS_URL, data={"data": query})
             if res.status_code == 429:
                 logger.warning("Overpass rate limit hit for tile %s", tile_key)
-                return   # leave tile uncached; next poll will retry
+                _tile_retry_after[tile_key] = time.time() + COOLDOWN_SECONDS
+                return   # leave tile uncached; retry after cooldown
             res.raise_for_status()
             elements = res.json().get("elements", [])
             await asyncio.to_thread(store_tile, elements, tile_key)
@@ -193,13 +197,24 @@ async def campings_endpoint(south: float, west: float, north: float, east: float
     if len(tiles) > MAX_TILES:
         return {"campings": [], "fetching": False}
 
-    missing = [t for t in tiles if not is_tile_cached(t) and t not in _fetching_tiles]
+    now = time.time()
+    missing = [
+        t for t in tiles
+        if not is_tile_cached(t)
+        and t not in _fetching_tiles
+        and now >= _tile_retry_after.get(t, 0)
+    ]
     for tile in missing:
+        _tile_retry_after.pop(tile, None)
         _fetching_tiles.add(tile)  # Mark in-flight before task starts — prevents race condition
         asyncio.create_task(fetch_tile(tile))
 
     result = await asyncio.to_thread(get_campings_in_bbox, south, west, north, east)
-    fetching = any(t in _fetching_tiles for t in tiles)
+    # fetching=True as long as any tile is in-flight OR in cooldown (but not yet cached)
+    fetching = any(
+        t in _fetching_tiles or (not is_tile_cached(t) and now < _tile_retry_after.get(t, 0))
+        for t in tiles
+    )
     return {"campings": result, "fetching": fetching}
 
 
