@@ -37,17 +37,24 @@ export default function CampingList({ campings, loading, error, tooFarOut }: Cam
       </div>
 
       <div className="flex-1 overflow-y-auto">
+        {!loading && !error && !tooFarOut && campings.length === 0 && (
+          <div className="px-4 py-6 text-sm text-gray-500 text-center">
+            Geen campings gevonden in dit gebied
+          </div>
+        )}
         {campings.map((c) => {
           const activeTags = (Object.entries(c.tags) as [string, unknown][])
             .filter(([, v]) => v === true)
             .map(([k]) => TAG_LABELS[k] ?? k);
+
+          const priceLabel = c.tags.charge ?? (c.tags.fee === "yes" ? "betaald" : c.tags.fee === "no" ? "gratis" : null);
 
           const eurocampingsUrl = `https://www.eurocampings.nl/zoeken/?q=${encodeURIComponent(c.name)}`;
 
           return (
             <div
               key={c.id}
-              className="px-4 py-3 border-b border-gray-800 hover:bg-gray-800/40 cursor-pointer transition-colors"
+              className="px-4 py-3 border-b border-gray-800 hover:bg-gray-800/40 transition-colors"
             >
               <div className="font-medium text-sm text-gray-100 mb-1">{c.name}</div>
               {activeTags.length > 0 && (
@@ -60,7 +67,10 @@ export default function CampingList({ campings, loading, error, tooFarOut }: Cam
                 </div>
               )}
               <div className="flex justify-between items-center text-xs text-gray-500">
-                <span>{c.lat.toFixed(3)}, {c.lon.toFixed(3)}</span>
+                <span className="flex gap-2">
+                  <span>{c.lat.toFixed(3)}, {c.lon.toFixed(3)}</span>
+                  {priceLabel && <span className="text-gray-400">{priceLabel}</span>}
+                </span>
                 <a
                   href={eurocampingsUrl}
                   target="_blank"
