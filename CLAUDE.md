@@ -21,9 +21,11 @@ Data: OpenStreetMap via Overpass API + Eurocampings deeplinks.
 Endpoint: https://overpass-api.de/api/interpreter
 Gebruik altijd [timeout:30][maxsize:1048576] en bounding box queries
 Alleen fetchen bij zoom >= 9 (anders te grote bbox → 500 error)
-Rate limiting: 30s cooldown tussen requests, debounce 1500ms, auto-retry bij 429
-In-memory cache (Map<id, Camping>) — toon cached campings direct, fetch op achtergrond
-Shift threshold: alleen refetch als kaartview >30% verschuift
+**Architectuur**: backend haalt Overpass op en slaat op in SQLite per 1°×1° tile (permanent gecached)
+Frontend roept `/api/campings` aan; backend geeft direct gecachede campings terug + start background tile fetch
+Frontend pollt elke 3s zolang `fetching: true`; stopt als alle tiles gecached zijn
+asyncio.Lock zorgt voor max 1 gelijktijdig Overpass verzoek (geen 429)
+Shift threshold: frontend refetcht alleen als kaartview >30% verschuift (debounce 800ms)
 
 ## Leaflet setup
 Importeer CSS in main.tsx: import 'leaflet/dist/leaflet.css'
@@ -41,7 +43,7 @@ Deeplink formaat: https://www.eurocampings.nl/zoeken/?q={naam}
 2. **AI chat** — DONE (KAM-2): `/api/chat` endpoint, ChatPanel component, LiteLLM/Cerebras
 3. **Bug fixes & cleanup** — DONE: LLM_MOCK, error handling, MapPanel StrictMode fix, local Leaflet icons, input limits, removed unused deps
 4. **Kaart** — DONE (KAM-3/KAM-11): Leaflet kaart met OSM tiles, gecentreerd op Frankrijk (46.5, 2.5) zoom 6
-5. **Overpass hook** — DONE (KAM-4): `useOverpass` hook, in-memory cache, rate limiting
+5. **Overpass hook** — DONE (KAM-4): backend SQLite tile cache, `/api/campings` endpoint, frontend polling
 6. **CampingList (live data)** — DONE (KAM-6): live OSM data, tag badges, Eurocampings deeplinks
 7. **Pins op kaart** — Campings als markers, klikbaar
 8. **Filters** — Faciliteiten, type, prijs toggles
@@ -54,8 +56,7 @@ Deeplink formaat: https://www.eurocampings.nl/zoeken/?q={naam}
 
 ## Aandachtspunten
 
-- **Overpass rate limiting**: niet bij elke kaartbeweging opnieuw fetchen. 
-  Gebruik debounce (500ms) en alleen refetch als kaartview >30% verschuift.
+- **Overpass rate limiting**: opgelost via backend SQLite tile cache. Elke 1°×1° tile wordt één keer opgehaald en permanent opgeslagen. asyncio.Lock voorkomt gelijktijdige requests. Frontend pollt alleen, doet zelf geen Overpass calls.
 - **Leaflet + React StrictMode**: kan dubbele renders geven, gebruik `useRef` voor de map instance.
 - **OSM datakwaliteit**: niet alle campings hebben alle tags. Toon altijd "onbekend" 
   als fallback, filter alleen op aanwezige tags.
