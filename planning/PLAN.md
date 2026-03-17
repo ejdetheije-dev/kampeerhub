@@ -7,10 +7,10 @@
 | KAM-1 scaffold | Done | FastAPI, Next.js static export, Docker, scripts |
 | KAM-2 AI chat | Done | `/api/chat`, ChatPanel, LiteLLM/Cerebras |
 | Bug fixes & cleanup | Done | LLM_MOCK, error handling, MapPanel StrictMode, local Leaflet icons, input limits |
-| KAM-3 Leaflet map | In progress | Map renders with OSM tiles, no real campsite data yet |
-| KAM-4 Overpass hook | Not started | |
+| KAM-3 Leaflet map | Done | Map renders with OSM tiles, centered on France (46.5, 2.5) zoom 6 |
+| KAM-4 Overpass hook | Done | `useOverpass` hook: debounce 1500ms, 30% shift threshold, 30s cooldown, in-memory cache, auto-retry on 429 |
 | KAM-5 Pins on map | Not started | |
-| KAM-6 CampingList (real data) | Not started | Placeholder hardcoded data only |
+| KAM-6 CampingList (real data) | Done | Live OSM data, tag badges, Eurocampings deeplinks |
 | KAM-7 Filters | Not started | |
 | KAM-8 Detail overlay | Not started | |
 | KAM-9 Weather widget | Not started | |
