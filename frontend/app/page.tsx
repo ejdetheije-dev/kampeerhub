@@ -14,6 +14,16 @@ export default function Home() {
 
   const handleSelectCamping = (camping: Camping) => setSelectedId(camping.id);
 
+  const sortedCampings = bounds
+    ? [...campings].sort((a, b) => {
+        const clat = (bounds.north + bounds.south) / 2;
+        const clon = (bounds.east + bounds.west) / 2;
+        const da = (a.lat - clat) ** 2 + (a.lon - clon) ** 2;
+        const db = (b.lat - clat) ** 2 + (b.lon - clon) ** 2;
+        return da - db;
+      })
+    : campings;
+
   return (
     <div className="flex flex-col h-screen bg-[#0d1117] text-gray-100">
       <header className="flex items-center px-4 h-12 border-b border-gray-800 shrink-0">
@@ -35,7 +45,7 @@ export default function Home() {
 
         <div className="w-96 flex flex-col border-l border-gray-800 shrink-0 overflow-hidden">
           <CampingList
-            campings={campings}
+            campings={sortedCampings}
             loading={loading}
             error={error}
             tooFarOut={tooFarOut}
