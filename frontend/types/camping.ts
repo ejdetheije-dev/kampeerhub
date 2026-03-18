@@ -23,3 +23,21 @@ export interface Camping {
     website?: string;
   };
 }
+
+export type SizeType = "all" | "small" | "medium" | "large" | "naturist";
+
+export interface Filters {
+  dog: boolean;
+  wifi: boolean;
+  pool: boolean;
+  sizeType: SizeType;
+  waterMaxKm: number | null; // null = disabled
+}
+
+export const DEFAULT_FILTERS: Filters = {
+  dog: false,
+  wifi: false,
+  pool: false,
+  sizeType: "all",
+  waterMaxKm: null,
+};
