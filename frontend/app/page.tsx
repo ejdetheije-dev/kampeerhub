@@ -6,7 +6,8 @@ import CampingList from "@/components/CampingList";
 import ChatPanel from "@/components/ChatPanel";
 import { useOverpass } from "@/hooks/useOverpass";
 import { useWaterBodies } from "@/hooks/useWaterBodies";
-import type { Bounds, Camping, Filters } from "@/types/camping"; // Camping used in handleSelectCamping
+import DetailOverlay from "@/components/DetailOverlay";
+import type { Bounds, Camping, Filters } from "@/types/camping";
 import { DEFAULT_FILTERS } from "@/types/camping";
 import type { WaterPoint } from "@/hooks/useWaterBodies";
 
@@ -62,6 +63,11 @@ export default function Home() {
 
   const handleSelectCamping = (camping: Camping) => setSelectedId(camping.id);
 
+  const selectedCamping = useMemo(
+    () => campings.find((c) => c.id === selectedId) ?? null,
+    [campings, selectedId],
+  );
+
   const sortedCampings = useMemo(() => {
     if (!bounds) return campings;
     const clat = (bounds.north + bounds.south) / 2;
@@ -101,13 +107,18 @@ export default function Home() {
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        <MapPanel
-          onBoundsChange={setBounds}
-          campings={campings}
-          filteredIds={filteredIds}
-          selectedId={selectedId}
-          onSelectCamping={handleSelectCamping}
-        />
+        <div className="relative flex-1 flex flex-col">
+          <MapPanel
+            onBoundsChange={setBounds}
+            campings={campings}
+            filteredIds={filteredIds}
+            selectedId={selectedId}
+            onSelectCamping={handleSelectCamping}
+          />
+          {selectedCamping && (
+            <DetailOverlay camping={selectedCamping} onClose={() => setSelectedId(null)} />
+          )}
+        </div>
 
         <div className="w-96 flex flex-col border-l border-gray-800 shrink-0 overflow-hidden">
           <CampingList
