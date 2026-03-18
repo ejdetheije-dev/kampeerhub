@@ -1,0 +1,12 @@
+[     -28ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://www.eurocampings.nl/zoeken/?q=Durrell%20Wildlife%20Camp:0
+[     699ms] [WARNING] Allow attribute will take precedence over 'allowfullscreen'. @ https://talkdeskchatsdk.talkdeskapp.com/v2/talkdeskchatsdk.js:0
+[     705ms] [ERROR] Access to XMLHttpRequest at 'https://endpoints-dot-acsi-prod.appspot.com/_ah/api/acsiGoogleCloudServicesApi/v1/getIndexedBookingProfile/GA1.1.1245344114.1773769524?key=AIzaSyDS7zsBJFrwg_xisOGYTfp2qBpHA8vO5_Y' from origin 'https://www.eurocampings.nl' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource. @ https://www.eurocampings.nl/zoeken/?q=Durrell%20Wildlife%20Camp:0
+[     706ms] [ERROR] Failed to load resource: net::ERR_FAILED @ https://endpoints-dot-acsi-prod.appspot.com/_ah/api/acsiGoogleCloudServicesApi/v1/getIndexedBookingProfile/GA1.1.1245344114.1773769524?key=AIzaSyDS7zsBJFrwg_xisOGYTfp2qBpHA8vO5_Y:0
+[    1577ms] Uncaught Error: Prohibited read from data layer variable: event.
+    at <anonymous> (https://www.googletagmanager.com/gtm.js?id=GTM-KRL4LK:384:525)
+    at gb (https://www.googletagmanager.com/gtm.js?id=GTM-KRL4LK:290:754)
+    at fb (https://www.googletagmanager.com/gtm.js?id=GTM-KRL4LK:290:469)
+    at <anonymous> (https://www.googletagmanager.com/gtm.js?id=GTM-KRL4LK:350:472)
+    at <anonymous> (https://www.googletagmanager.com/gtm.js?id=GTM-KRL4LK:326:465)
+    at r (https://www.googletagmanager.com/gtm.js?id=GTM-KRL4LK:330:113)
+    at <anonymous> (https://www.googletagmanager.com/gtm.js?id=GTM-KRL4LK:779:81)
