@@ -238,12 +238,11 @@ async def fetch_water_tile(tile_key: str) -> None:
     try:
         lat, lon = map(int, tile_key.split("_"))
         query = (
-            f"[out:json][timeout:30][maxsize:67108864];\n(\n"
-            f'  node["natural"="water"]({lat},{lon},{lat+1},{lon+1});\n'
-            f'  way["natural"="water"]({lat},{lon},{lat+1},{lon+1});\n'
-            f'  node["natural"~"^(bay|strait)$"]({lat},{lon},{lat+1},{lon+1});\n'
-            f'  node["place"~"^(sea|ocean)$"]({lat},{lon},{lat+1},{lon+1});\n'
-            f'  way["waterway"~"^(river|canal)$"]({lat},{lon},{lat+1},{lon+1});\n'
+            f"[out:json][timeout:30][maxsize:8388608];\n(\n"
+            f'  way["natural"="beach"]({lat},{lon},{lat+1},{lon+1});\n'
+            f'  node["natural"="bay"]({lat},{lon},{lat+1},{lon+1});\n'
+            f'  relation["natural"="water"]["water"="lake"]({lat},{lon},{lat+1},{lon+1});\n'
+            f'  relation["waterway"="river"]({lat},{lon},{lat+1},{lon+1});\n'
             f");\nout center;"
         )
         async with _overpass_lock:

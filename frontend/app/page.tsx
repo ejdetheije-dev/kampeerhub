@@ -20,9 +20,11 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
   return R * 2 * Math.asin(Math.sqrt(a));
 }
 
-function minDistToWater(lat: number, lon: number, points: WaterPoint[]): number {
-  if (points.length === 0) return Infinity;
-  return Math.min(...points.map((p) => haversine(lat, lon, p.lat, p.lon)));
+function isWithinWaterDist(lat: number, lon: number, points: WaterPoint[], maxKm: number): boolean {
+  for (const p of points) {
+    if (haversine(lat, lon, p.lat, p.lon) <= maxKm) return true;
+  }
+  return false;
 }
 
 function applyFilters(campings: Camping[], filters: Filters, waterPoints: WaterPoint[]): Camping[] {
@@ -44,8 +46,7 @@ function applyFilters(campings: Camping[], filters: Filters, waterPoints: WaterP
     }
 
     if (filters.waterMaxKm !== null && waterPoints.length > 0) {
-      const dist = minDistToWater(c.lat, c.lon, waterPoints);
-      if (dist > filters.waterMaxKm) return false;
+      if (!isWithinWaterDist(c.lat, c.lon, waterPoints, filters.waterMaxKm)) return false;
     }
 
     return true;
