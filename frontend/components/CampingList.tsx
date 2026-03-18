@@ -1,6 +1,7 @@
 "use client";
 
-import type { Camping } from "@/types/camping";
+import type { Camping, Filters } from "@/types/camping";
+import FilterPanel from "@/components/FilterPanel";
 
 const TAG_LABELS: Record<string, string> = {
   dog: "honden",
@@ -12,14 +13,29 @@ const TAG_LABELS: Record<string, string> = {
 
 interface CampingListProps {
   campings: Camping[];
+  totalCount: number;
   loading: boolean;
   error: string | null;
   tooFarOut: boolean;
   selectedId?: string | null;
   onSelect?: (camping: Camping) => void;
+  filters: Filters;
+  onFiltersChange: (f: Filters) => void;
+  capacityDataPct: number;
 }
 
-export default function CampingList({ campings, loading, error, tooFarOut, selectedId, onSelect }: CampingListProps) {
+export default function CampingList({
+  campings,
+  totalCount,
+  loading,
+  error,
+  tooFarOut,
+  selectedId,
+  onSelect,
+  filters,
+  onFiltersChange,
+  capacityDataPct,
+}: CampingListProps) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-800 flex items-center gap-2">
@@ -32,11 +48,17 @@ export default function CampingList({ campings, loading, error, tooFarOut, selec
             <span className="text-red-400">{error}</span>
           ) : (
             <>
-              <span className="text-[#209dd7] font-semibold">{campings.length}</span> campings gevonden
+              <span className="text-[#209dd7] font-semibold">{campings.length}</span>
+              {campings.length !== totalCount && (
+                <span className="text-gray-600"> van {totalCount}</span>
+              )}{" "}
+              campings
             </>
           )}
         </span>
       </div>
+
+      <FilterPanel filters={filters} onChange={onFiltersChange} capacityDataPct={capacityDataPct} />
 
       <div className="flex-1 overflow-y-auto">
         {!loading && !error && !tooFarOut && campings.length === 0 && (
@@ -51,8 +73,9 @@ export default function CampingList({ campings, loading, error, tooFarOut, selec
 
           const priceLabel = c.tags.charge ?? (c.tags.fee === "yes" ? "betaald" : c.tags.fee === "no" ? "gratis" : null);
 
-          const websiteUrl = c.tags.website
-            ?? `https://www.eurocampings.nl/search/specific/?query=${encodeURIComponent(c.name + " " + c.lat.toFixed(2) + " " + c.lon.toFixed(2))}`;
+          const websiteUrl =
+            c.tags.website ??
+            `https://www.eurocampings.nl/search/specific/?query=${encodeURIComponent(c.name + " " + c.lat.toFixed(2) + " " + c.lon.toFixed(2))}`;
 
           const isSelected = c.id === selectedId;
           return (
@@ -73,7 +96,9 @@ export default function CampingList({ campings, loading, error, tooFarOut, selec
               )}
               <div className="flex justify-between items-center text-xs text-gray-500">
                 <span className="flex gap-2">
-                  <span>{c.lat.toFixed(3)}, {c.lon.toFixed(3)}</span>
+                  <span>
+                    {c.lat.toFixed(3)}, {c.lon.toFixed(3)}
+                  </span>
                   {priceLabel && <span className="text-gray-400">{priceLabel}</span>}
                 </span>
                 <a
