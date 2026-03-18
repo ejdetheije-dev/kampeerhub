@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import type { Camping } from "@/types/camping";
 
 const TAG_LABELS: Record<string, string> = {
@@ -10,6 +11,26 @@ const TAG_LABELS: Record<string, string> = {
   nudism: "naturist",
 };
 
+function weatherLabel(code: number): string {
+  if (code === 0) return "zon";
+  if (code <= 3) return "bew";
+  if (code <= 48) return "mist";
+  if (code <= 55) return "mot";
+  if (code <= 65) return "reg";
+  if (code <= 77) return "snw";
+  if (code <= 82) return "bui";
+  if (code <= 86) return "snb";
+  return "onw";
+}
+
+interface DayForecast {
+  date: string;
+  max: number;
+  min: number;
+  precip: number;
+  code: number;
+}
+
 interface DetailOverlayProps {
   camping: Camping;
   onClose: () => void;
@@ -17,6 +38,33 @@ interface DetailOverlayProps {
 
 export default function DetailOverlay({ camping, onClose }: DetailOverlayProps) {
   const { tags } = camping;
+  const [forecast, setForecast] = useState<DayForecast[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const url =
+      `https://api.open-meteo.com/v1/forecast?latitude=${camping.lat}&longitude=${camping.lon}` +
+      `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode` +
+      `&forecast_days=7&timezone=Europe%2FParis`;
+
+    fetch(url)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        const d = data.daily;
+        const days: DayForecast[] = d.time.map((t: string, i: number) => ({
+          date: t,
+          max: Math.round(d.temperature_2m_max[i]),
+          min: Math.round(d.temperature_2m_min[i]),
+          precip: Math.round(d.precipitation_sum[i] * 10) / 10,
+          code: d.weathercode[i],
+        }));
+        setForecast(days);
+      })
+      .catch(() => {});
+
+    return () => { cancelled = true; };
+  }, [camping.lat, camping.lon]);
 
   const activeTags = (Object.entries(tags) as [string, unknown][])
     .filter(([k, v]) => v === true && TAG_LABELS[k])
@@ -29,6 +77,8 @@ export default function DetailOverlay({ camping, onClose }: DetailOverlayProps) 
       )}`;
 
   const priceLabel = tags.charge ?? (tags.fee === "yes" ? "betaald" : tags.fee === "no" ? "gratis" : null);
+
+  const dayNames = ["zo", "ma", "di", "wo", "do", "vr", "za"];
 
   return (
     <div className="absolute bottom-4 left-4 z-[1000] w-80 bg-[#0d1117] border border-gray-700 rounded shadow-xl text-gray-100">
@@ -68,9 +118,33 @@ export default function DetailOverlay({ camping, onClose }: DetailOverlayProps) 
             </div>
           )}
           <div>
-            <span className="text-gray-500">coördinaten: </span>
-            {camping.lat.toFixed(5)}, {camping.lon.toFixed(5)}
+            <span className="text-gray-500">coord: </span>
+            {camping.lat.toFixed(4)}, {camping.lon.toFixed(4)}
           </div>
+        </div>
+
+        {/* 7-day weather forecast */}
+        <div className="border-t border-gray-800 pt-3">
+          {!forecast ? (
+            <div className="text-gray-600 text-xs">weer laden...</div>
+          ) : (
+            <div className="grid grid-cols-7 gap-0.5 text-center">
+              {forecast.map((day) => {
+                const d = new Date(day.date);
+                return (
+                  <div key={day.date} className="flex flex-col items-center gap-0.5">
+                    <span className="text-gray-500">{dayNames[d.getDay()]}</span>
+                    <span className="text-[#209dd7] font-medium">{day.max}°</span>
+                    <span className="text-gray-500">{day.min}°</span>
+                    <span className="text-gray-600 text-[10px]">{weatherLabel(day.code)}</span>
+                    {day.precip > 0 && (
+                      <span className="text-blue-400 text-[10px]">{day.precip}mm</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="flex gap-3 pt-1">
