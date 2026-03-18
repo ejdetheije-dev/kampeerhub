@@ -49,6 +49,7 @@ _openrouter_api_key: str | None = None
 # One Overpass request at a time; set tracks in-progress tile keys
 _overpass_lock = asyncio.Lock()
 _fetching_tiles: set[str] = set()
+_fetching_water_tiles: set[str] = set()
 _tile_retry_after: dict[str, float] = {}  # tile_key -> earliest retry timestamp after 429
 COOLDOWN_SECONDS = 60
 
@@ -74,7 +75,22 @@ def init_db() -> None:
                 fetched_at INTEGER NOT NULL
             )
         """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS water_points (
+                id       INTEGER PRIMARY KEY AUTOINCREMENT,
+                tile_key TEXT NOT NULL,
+                lat      REAL NOT NULL,
+                lon      REAL NOT NULL
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS water_tiles (
+                tile_key   TEXT PRIMARY KEY,
+                fetched_at INTEGER NOT NULL
+            )
+        """)
         con.execute("CREATE INDEX IF NOT EXISTS idx_campings_bbox ON campings(lat, lon)")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_water_points_bbox ON water_points(lat, lon)")
         con.commit()
 
 
@@ -128,6 +144,44 @@ def get_campings_in_bbox(south: float, west: float, north: float, east: float) -
     return [{"id": r[0], "name": r[1], "lat": r[2], "lon": r[3], "tags": json.loads(r[4])} for r in rows]
 
 
+def is_water_tile_cached(tile_key: str) -> bool:
+    with closing(sqlite3.connect(DB_PATH)) as con:
+        row = con.execute(
+            "SELECT 1 FROM water_tiles WHERE tile_key = ? AND fetched_at > strftime('%s','now') - ?",
+            (tile_key, TILE_TTL_SECONDS),
+        ).fetchone()
+    return row is not None
+
+
+def store_water_tile(elements: list, tile_key: str) -> None:
+    with closing(sqlite3.connect(DB_PATH)) as con:
+        for el in elements:
+            lat = el.get("lat") or (el.get("center") or {}).get("lat")
+            lon = el.get("lon") or (el.get("center") or {}).get("lon")
+            if lat is None or lon is None:
+                continue
+            con.execute(
+                "INSERT INTO water_points (tile_key, lat, lon) VALUES (?, ?, ?)",
+                (tile_key, lat, lon),
+            )
+        con.execute(
+            "INSERT OR REPLACE INTO water_tiles (tile_key, fetched_at) VALUES (?, strftime('%s','now'))",
+            (tile_key,),
+        )
+        con.commit()
+
+
+def get_water_points_in_bbox(south: float, west: float, north: float, east: float) -> list[dict]:
+    margin = 0.5
+    with closing(sqlite3.connect(DB_PATH)) as con:
+        rows = con.execute(
+            "SELECT lat, lon FROM water_points "
+            "WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?",
+            (south - margin, north + margin, west - margin, east + margin),
+        ).fetchall()
+    return [{"lat": r[0], "lon": r[1]} for r in rows]
+
+
 # --- Tile fetching ---
 
 def tile_keys(south: float, west: float, north: float, east: float) -> list[str]:
@@ -171,6 +225,35 @@ async def fetch_tile(tile_key: str) -> None:
         logger.exception("Failed to fetch tile %s", tile_key)
     finally:
         _fetching_tiles.discard(tile_key)
+
+
+async def fetch_water_tile(tile_key: str) -> None:
+    """Fetch water bodies for a 1°×1° tile from Overpass and persist to SQLite."""
+    try:
+        lat, lon = map(int, tile_key.split("_"))
+        query = (
+            f"[out:json][timeout:30][maxsize:2097152];\n(\n"
+            f'  way["natural"="coastline"]({lat},{lon},{lat+1},{lon+1});\n'
+            f'  way["natural"="water"]({lat},{lon},{lat+1},{lon+1});\n'
+            f'  node["natural"="water"]({lat},{lon},{lat+1},{lon+1});\n'
+            f'  way["waterway"~"^(river|canal)$"]({lat},{lon},{lat+1},{lon+1});\n'
+            f");\nout center;"
+        )
+        async with _overpass_lock:
+            if is_water_tile_cached(tile_key):
+                return
+            async with httpx.AsyncClient(timeout=40.0) as client:
+                res = await client.post(OVERPASS_URL, data={"data": query})
+            if res.status_code == 429:
+                logger.warning("Overpass rate limit hit for water tile %s", tile_key)
+                return
+            res.raise_for_status()
+            elements = res.json().get("elements", [])
+            await asyncio.to_thread(store_water_tile, elements, tile_key)
+    except Exception:
+        logger.exception("Failed to fetch water tile %s", tile_key)
+    finally:
+        _fetching_water_tiles.discard(tile_key)
 
 
 # --- App ---
@@ -217,6 +300,26 @@ async def campings_endpoint(south: float, west: float, north: float, east: float
         for t in tiles
     )
     return {"campings": result, "fetching": fetching}
+
+
+@app.get("/api/water-bodies")
+async def water_bodies_endpoint(south: float, west: float, north: float, east: float) -> dict:
+    """Return water body representative points for client-side distance calculations."""
+    if not (-90 <= south < north <= 90) or not (-180 <= west <= 180) or not (-180 <= east <= 180):
+        raise HTTPException(status_code=422, detail="Ongeldige bounding box parameters")
+
+    tiles = tile_keys(south, west, north, east)
+    if len(tiles) > MAX_TILES:
+        return {"points": [], "fetching": False}
+
+    missing = [t for t in tiles if not is_water_tile_cached(t) and t not in _fetching_water_tiles]
+    for tile in missing:
+        _fetching_water_tiles.add(tile)
+        asyncio.create_task(fetch_water_tile(tile))
+
+    points = await asyncio.to_thread(get_water_points_in_bbox, south, west, north, east)
+    fetching = any(t in _fetching_water_tiles or not is_water_tile_cached(t) for t in tiles)
+    return {"points": points, "fetching": fetching}
 
 
 # --- Chat ---
