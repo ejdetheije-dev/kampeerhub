@@ -51,7 +51,8 @@ export default function CampingList({ campings, loading, error, tooFarOut, selec
 
           const priceLabel = c.tags.charge ?? (c.tags.fee === "yes" ? "betaald" : c.tags.fee === "no" ? "gratis" : null);
 
-          const eurocampingsUrl = `https://www.eurocampings.nl/zoeken/?q=${encodeURIComponent(c.name)}`;
+          const websiteUrl = c.tags.website
+            ?? `https://www.eurocampings.nl/search/specific/?query=${encodeURIComponent(c.name + " " + c.lat.toFixed(2) + " " + c.lon.toFixed(2))}`;
 
           const isSelected = c.id === selectedId;
           return (
@@ -76,13 +77,13 @@ export default function CampingList({ campings, loading, error, tooFarOut, selec
                   {priceLabel && <span className="text-gray-400">{priceLabel}</span>}
                 </span>
                 <a
-                  href={eurocampingsUrl}
+                  href={websiteUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-[#209dd7] hover:underline"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  Eurocampings
+                  {c.tags.website ? "Website" : "Eurocampings"}
                 </a>
               </div>
             </div>
