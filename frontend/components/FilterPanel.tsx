@@ -7,14 +7,13 @@ import { DEFAULT_FILTERS } from "@/types/camping";
 interface FilterPanelProps {
   filters: Filters;
   onChange: (f: Filters) => void;
-  capacityDataPct?: number; // % of campings with capacity data (for info note)
+  capacityDataPct: number;
 }
 
-const FACILITIES: [keyof Pick<Filters, "dog" | "wifi" | "pool" | "electricity">, string][] = [
+const FACILITIES: [keyof Pick<Filters, "dog" | "wifi" | "pool">, string][] = [
   ["dog", "honden"],
   ["wifi", "wifi"],
   ["pool", "zwembad"],
-  ["electricity", "stroom"],
 ];
 
 const SIZE_TYPES: [SizeType, string][] = [
@@ -34,9 +33,7 @@ export default function FilterPanel({ filters, onChange, capacityDataPct }: Filt
     filters.dog,
     filters.wifi,
     filters.pool,
-    filters.electricity,
     filters.sizeType !== "all",
-    filters.priceMax < 80,
     filters.waterMaxKm !== null,
   ].filter(Boolean).length;
 
@@ -94,32 +91,11 @@ export default function FilterPanel({ filters, onChange, capacityDataPct }: Filt
                 </label>
               ))}
             </div>
-            {filters.sizeType !== "all" && filters.sizeType !== "naturist" && capacityDataPct !== undefined && (
+            {filters.sizeType !== "all" && filters.sizeType !== "naturist" && (
               <div className="mt-1.5 text-xs text-gray-600">
-                {capacityDataPct}% campings heeft capaciteitsdata in OSM
+                {capacityDataPct}% campings heeft capaciteitsdata — overige worden ook getoond
               </div>
             )}
-          </div>
-
-          {/* Prijs */}
-          <div>
-            <div className="text-xs text-gray-500 mb-1.5">
-              Max prijs:{" "}
-              {filters.priceMax >= 80 ? (
-                <span className="text-gray-400">geen limiet</span>
-              ) : (
-                <span className="text-gray-300">€{filters.priceMax}/nacht</span>
-              )}
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={80}
-              step={5}
-              value={filters.priceMax}
-              onChange={(e) => set({ priceMax: Number(e.target.value) })}
-              className="w-full accent-[#209dd7]"
-            />
           </div>
 
           {/* Afstand tot water */}

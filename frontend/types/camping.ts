@@ -30,9 +30,7 @@ export interface Filters {
   dog: boolean;
   wifi: boolean;
   pool: boolean;
-  electricity: boolean;
   sizeType: SizeType;
-  priceMax: number;       // 80 = no limit
   waterMaxKm: number | null; // null = disabled
 }
 
@@ -40,8 +38,6 @@ export const DEFAULT_FILTERS: Filters = {
   dog: false,
   wifi: false,
   pool: false,
-  electricity: false,
   sizeType: "all",
-  priceMax: 80,
   waterMaxKm: null,
 };

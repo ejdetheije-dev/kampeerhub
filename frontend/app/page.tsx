@@ -6,7 +6,7 @@ import CampingList from "@/components/CampingList";
 import ChatPanel from "@/components/ChatPanel";
 import { useOverpass } from "@/hooks/useOverpass";
 import { useWaterBodies } from "@/hooks/useWaterBodies";
-import type { Bounds, Camping, Filters } from "@/types/camping";
+import type { Bounds, Camping, Filters } from "@/types/camping"; // Camping used in handleSelectCamping
 import { DEFAULT_FILTERS } from "@/types/camping";
 import type { WaterPoint } from "@/hooks/useWaterBodies";
 
@@ -25,27 +25,14 @@ function minDistToWater(lat: number, lon: number, points: WaterPoint[]): number 
   return Math.min(...points.map((p) => haversine(lat, lon, p.lat, p.lon)));
 }
 
-function effectivePrice(c: Camping): number | null {
-  if (c.tags.fee === "no") return 0;
-  if (c.tags.charge) {
-    const match = c.tags.charge.match(/(\d+(?:[.,]\d+)?)/);
-    if (match) return parseFloat(match[1].replace(",", "."));
-  }
-  // fee=yes but no parseable charge → camping IS paid, unknown amount
-  if (c.tags.fee === "yes") return Infinity;
-  return null; // completely unknown → don't filter
-}
-
 function applyFilters(campings: Camping[], filters: Filters, waterPoints: WaterPoint[]): Camping[] {
   return campings.filter((c) => {
-    // Facility filters: only exclude campings that explicitly lack the feature
     if (filters.dog && !c.tags.dog) return false;
     if (filters.wifi && !c.tags.wifi) return false;
     if (filters.pool && !c.tags.pool) return false;
-    if (filters.electricity && !c.tags.electricity) return false;
 
-    // Type filter: lenient — campings without capacity data are included
-    // (per spec: "OSM tags die ontbreken worden niet meegenomen in filtering")
+    // Type filter: campings zonder capaciteitsdata worden altijd getoond
+    // zodat klein ∪ middelgroot ∪ groot = alle
     if (filters.sizeType === "naturist") {
       if (!c.tags.nudism) return false;
     } else if (filters.sizeType === "small" && c.tags.capacity != null) {
@@ -56,13 +43,6 @@ function applyFilters(campings: Camping[], filters: Filters, waterPoints: WaterP
       if (c.tags.capacity <= 200) return false;
     }
 
-    // Price filter: use fee=yes as "camping costs something" even without charge tag
-    if (filters.priceMax < 80) {
-      const price = effectivePrice(c);
-      if (price !== null && price > filters.priceMax) return false;
-    }
-
-    // Water distance filter: only apply when water points have loaded
     if (filters.waterMaxKm !== null && waterPoints.length > 0) {
       const dist = minDistToWater(c.lat, c.lon, waterPoints);
       if (dist > filters.waterMaxKm) return false;
