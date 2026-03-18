@@ -9,6 +9,18 @@ export interface WaterPoint {
 }
 
 const POLL_MS = 5000;
+// Keep one representative point per ~1km cell to reduce computation load
+const GRID_DEG = 0.02; // ~2km grid — keeps precision while cutting point count ~5x
+
+function sample(points: WaterPoint[]): WaterPoint[] {
+  const seen = new Set<string>();
+  return points.filter((p) => {
+    const key = `${Math.round(p.lat / GRID_DEG)}_${Math.round(p.lon / GRID_DEG)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 export function useWaterBodies(bounds: Bounds | null, enabled: boolean): WaterPoint[] {
   const [points, setPoints] = useState<WaterPoint[]>([]);
@@ -31,7 +43,7 @@ export function useWaterBodies(bounds: Bounds | null, enabled: boolean): WaterPo
       .then((data: { points: WaterPoint[]; fetching: boolean }) => {
         if (!mountedRef.current) return;
         if (data.points.length > 0) {
-          setPoints(data.points);
+          setPoints(sample(data.points));
         }
         if (data.fetching || data.points.length === 0) {
           pollRef.current = setTimeout(() => {
