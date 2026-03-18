@@ -6,6 +6,7 @@ import CampingList from "@/components/CampingList";
 import ChatPanel from "@/components/ChatPanel";
 import { useOverpass } from "@/hooks/useOverpass";
 import { useWaterBodies } from "@/hooks/useWaterBodies";
+import { useFavorites } from "@/hooks/useFavorites";
 import DetailOverlay from "@/components/DetailOverlay";
 import type { Bounds, Camping, Filters } from "@/types/camping";
 import { DEFAULT_FILTERS } from "@/types/camping";
@@ -34,8 +35,6 @@ function applyFilters(campings: Camping[], filters: Filters, waterPoints: WaterP
     if (filters.wifi && !c.tags.wifi) return false;
     if (filters.pool && !c.tags.pool) return false;
 
-    // Type filter: campings zonder capaciteitsdata worden altijd getoond
-    // zodat klein ∪ middelgroot ∪ groot = alle
     if (filters.sizeType === "naturist") {
       if (!c.tags.nudism) return false;
     } else if (filters.sizeType === "small" && c.tags.capacity != null) {
@@ -58,8 +57,10 @@ export default function Home() {
   const [bounds, setBounds] = useState<Bounds | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const { campings, loading, error, tooFarOut } = useOverpass(bounds);
   const waterPoints = useWaterBodies(bounds, filters.waterMaxKm !== null);
+  const { favorites, toggleFavorite } = useFavorites();
 
   const handleSelectCamping = (camping: Camping) => setSelectedId(camping.id);
 
@@ -79,10 +80,10 @@ export default function Home() {
     });
   }, [campings, bounds]);
 
-  const filteredCampings = useMemo(
-    () => applyFilters(sortedCampings, filters, waterPoints),
-    [sortedCampings, filters, waterPoints],
-  );
+  const filteredCampings = useMemo(() => {
+    const base = applyFilters(sortedCampings, filters, waterPoints);
+    return showFavoritesOnly ? base.filter((c) => favorites.has(c.id)) : base;
+  }, [sortedCampings, filters, waterPoints, showFavoritesOnly, favorites]);
 
   const filteredIds = useMemo(
     () => new Set(filteredCampings.map((c) => c.id)),
@@ -116,7 +117,12 @@ export default function Home() {
             onSelectCamping={handleSelectCamping}
           />
           {selectedCamping && (
-            <DetailOverlay camping={selectedCamping} onClose={() => setSelectedId(null)} />
+            <DetailOverlay
+              camping={selectedCamping}
+              isFavorite={favorites.has(selectedCamping.id)}
+              onToggleFavorite={() => toggleFavorite(selectedCamping.id)}
+              onClose={() => setSelectedId(null)}
+            />
           )}
         </div>
 
@@ -132,6 +138,10 @@ export default function Home() {
             filters={filters}
             onFiltersChange={setFilters}
             capacityDataPct={capacityDataPct}
+            favorites={favorites}
+            onToggleFavorite={toggleFavorite}
+            showFavoritesOnly={showFavoritesOnly}
+            onToggleFavoritesOnly={() => setShowFavoritesOnly((v) => !v)}
           />
           <ChatPanel />
         </div>

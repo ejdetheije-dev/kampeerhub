@@ -31,12 +31,26 @@ interface DayForecast {
   code: number;
 }
 
+function HeartIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={`w-4 h-4 ${filled ? "fill-[#ecad0a] stroke-[#ecad0a]" : "fill-none stroke-gray-500"}`}
+      strokeWidth={2}
+    >
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+    </svg>
+  );
+}
+
 interface DetailOverlayProps {
   camping: Camping;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
   onClose: () => void;
 }
 
-export default function DetailOverlay({ camping, onClose }: DetailOverlayProps) {
+export default function DetailOverlay({ camping, isFavorite, onToggleFavorite, onClose }: DetailOverlayProps) {
   const { tags } = camping;
   const [forecast, setForecast] = useState<DayForecast[] | null>(null);
 
@@ -84,13 +98,21 @@ export default function DetailOverlay({ camping, onClose }: DetailOverlayProps) 
     <div className="absolute bottom-4 left-4 z-[1000] w-80 bg-[#0d1117] border border-gray-700 rounded shadow-xl text-gray-100">
       <div className="flex items-start justify-between px-4 pt-4 pb-2 border-b border-gray-800">
         <span className="font-semibold text-sm leading-snug pr-2">{camping.name}</span>
-        <button
-          onClick={onClose}
-          className="text-gray-500 hover:text-gray-200 text-lg leading-none shrink-0"
-          aria-label="Sluiten"
-        >
-          ×
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={onToggleFavorite}
+            aria-label={isFavorite ? "Verwijder favoriet" : "Voeg toe aan favorieten"}
+          >
+            <HeartIcon filled={isFavorite} />
+          </button>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-200 text-lg leading-none"
+            aria-label="Sluiten"
+          >
+            ×
+          </button>
+        </div>
       </div>
 
       <div className="px-4 py-3 space-y-3 text-xs">

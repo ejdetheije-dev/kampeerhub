@@ -11,6 +11,18 @@ const TAG_LABELS: Record<string, string> = {
   nudism: "naturist",
 };
 
+function HeartIcon({ filled }: { filled: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={`w-4 h-4 ${filled ? "fill-[#ecad0a] stroke-[#ecad0a]" : "fill-none stroke-gray-500"}`}
+      strokeWidth={2}
+    >
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+    </svg>
+  );
+}
+
 interface CampingListProps {
   campings: Camping[];
   totalCount: number;
@@ -22,6 +34,10 @@ interface CampingListProps {
   filters: Filters;
   onFiltersChange: (f: Filters) => void;
   capacityDataPct: number;
+  favorites: Set<string>;
+  onToggleFavorite: (id: string) => void;
+  showFavoritesOnly: boolean;
+  onToggleFavoritesOnly: () => void;
 }
 
 export default function CampingList({
@@ -35,11 +51,15 @@ export default function CampingList({
   filters,
   onFiltersChange,
   capacityDataPct,
+  favorites,
+  onToggleFavorite,
+  showFavoritesOnly,
+  onToggleFavoritesOnly,
 }: CampingListProps) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-800 flex items-center gap-2">
-        <span className="text-sm text-gray-400">
+        <span className="text-sm text-gray-400 flex-1">
           {tooFarOut ? (
             <span className="text-gray-500">zoom in om campings te laden</span>
           ) : loading ? (
@@ -56,6 +76,13 @@ export default function CampingList({
             </>
           )}
         </span>
+        <button
+          onClick={onToggleFavoritesOnly}
+          title={showFavoritesOnly ? "Toon alle campings" : "Toon alleen favorieten"}
+          className={`p-1 rounded transition-colors ${showFavoritesOnly ? "text-[#ecad0a]" : "text-gray-600 hover:text-gray-400"}`}
+        >
+          <HeartIcon filled={showFavoritesOnly} />
+        </button>
       </div>
 
       <FilterPanel filters={filters} onChange={onFiltersChange} capacityDataPct={capacityDataPct} />
@@ -63,7 +90,7 @@ export default function CampingList({
       <div className="flex-1 overflow-y-auto">
         {!loading && !error && !tooFarOut && campings.length === 0 && (
           <div className="px-4 py-6 text-sm text-gray-500 text-center">
-            Geen campings gevonden in dit gebied
+            {showFavoritesOnly ? "Geen favorieten opgeslagen" : "Geen campings gevonden in dit gebied"}
           </div>
         )}
         {campings.map((c) => {
@@ -78,13 +105,24 @@ export default function CampingList({
             `https://www.eurocampings.nl/search/specific/?query=${encodeURIComponent(c.name + " " + c.lat.toFixed(2) + " " + c.lon.toFixed(2))}`;
 
           const isSelected = c.id === selectedId;
+          const isFav = favorites.has(c.id);
+
           return (
             <div
               key={c.id}
               onClick={() => onSelect?.(c)}
               className={`px-4 py-3 border-b border-gray-800 cursor-pointer transition-colors ${isSelected ? "bg-gray-700/60 border-l-2 border-l-[#ecad0a]" : "hover:bg-gray-800/40"}`}
             >
-              <div className="font-medium text-sm text-gray-100 mb-1">{c.name}</div>
+              <div className="flex items-start justify-between mb-1">
+                <div className="font-medium text-sm text-gray-100">{c.name}</div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onToggleFavorite(c.id); }}
+                  className="ml-2 shrink-0 p-0.5"
+                  aria-label={isFav ? "Verwijder favoriet" : "Voeg toe aan favorieten"}
+                >
+                  <HeartIcon filled={isFav} />
+                </button>
+              </div>
               {activeTags.length > 0 && (
                 <div className="flex flex-wrap gap-1 mb-2">
                   {activeTags.map((tag) => (
