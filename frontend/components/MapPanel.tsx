@@ -8,11 +8,12 @@ import type { Bounds, Camping } from "@/types/camping";
 interface MapPanelProps {
   onBoundsChange?: (bounds: Bounds) => void;
   campings?: Camping[];
+  filteredIds?: Set<string>;
   selectedId?: string | null;
   onSelectCamping?: (camping: Camping) => void;
 }
 
-export default function MapPanel({ onBoundsChange, campings = [], selectedId, onSelectCamping }: MapPanelProps) {
+export default function MapPanel({ onBoundsChange, campings = [], filteredIds, selectedId, onSelectCamping }: MapPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const markersRef = useRef<LayerGroup | null>(null);
@@ -84,20 +85,27 @@ export default function MapPanel({ onBoundsChange, campings = [], selectedId, on
     import("leaflet").then((L) => {
       layerGroup.clearLayers();
 
+      const hasActiveFilter = filteredIds !== undefined && filteredIds.size < campings.length;
+
       campings.forEach((camping) => {
         const isSelected = camping.id === selectedId;
+        const isFiltered = hasActiveFilter && !filteredIds!.has(camping.id);
+        const size = isSelected ? 14 : 10;
+        const color = isSelected ? "#ecad0a" : isFiltered ? "#555" : "#209dd7";
+        const opacity = isFiltered ? 0.35 : 1;
         const icon = L.divIcon({
           className: "",
           html: `<div style="
-            width:${isSelected ? 14 : 10}px;
-            height:${isSelected ? 14 : 10}px;
+            width:${size}px;
+            height:${size}px;
             border-radius:50%;
-            background:${isSelected ? "#ecad0a" : "#209dd7"};
+            background:${color};
             border:2px solid ${isSelected ? "#fff" : "#0d1117"};
             box-shadow:0 0 4px rgba(0,0,0,0.5);
+            opacity:${opacity};
           "></div>`,
-          iconSize: [isSelected ? 14 : 10, isSelected ? 14 : 10],
-          iconAnchor: [isSelected ? 7 : 5, isSelected ? 7 : 5],
+          iconSize: [size, size],
+          iconAnchor: [size / 2, size / 2],
         });
 
         const marker = L.marker([camping.lat, camping.lon], { icon });
@@ -106,7 +114,7 @@ export default function MapPanel({ onBoundsChange, campings = [], selectedId, on
         marker.addTo(layerGroup);
       });
     });
-  }, [campings, selectedId]);
+  }, [campings, filteredIds, selectedId]);
 
   return (
     <div className="flex-1 relative">
