@@ -48,7 +48,7 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 5. **Overpass hook** — DONE (KAM-4): backend SQLite tile cache, `/api/campings` endpoint, frontend polling
 6. **CampingList (live data)** — DONE (KAM-6): live OSM data, tag badges, gesorteerd op afstand tot kaartcentrum, OSM website tag als primaire deeplink
 7. **Pins op kaart** — DONE (KAM-5): divIcon cirkels op kaart, klikbaar; selectie gedeeld tussen kaart en lijst
-8. **Filters** — Faciliteiten, type, prijs toggles
+8. **Filters** — DONE (KAM-7): uitklapbaar filterpanel (faciliteiten, type/grootte, afstand tot water slider); `/api/water-bodies` endpoint met SQLite tile cache
 9. **Detail overlay** — Bij klik op camping: naam, tags, Eurocampings link
 10. **Weer widget** — Open-Meteo per geselecteerde camping
 11. **Favorieten** — Hart-icoon + opslag
@@ -58,7 +58,8 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 
 ## Aandachtspunten
 
-- **Overpass rate limiting**: opgelost via backend SQLite tile cache. Elke 1°×1° tile wordt één keer opgehaald en permanent opgeslagen. asyncio.Lock voorkomt gelijktijdige requests. Frontend pollt alleen, doet zelf geen Overpass calls.
+- **Overpass rate limiting**: opgelost via backend SQLite tile cache. Elke 1°×1° tile wordt één keer opgehaald en permanent opgeslagen. asyncio.Lock voorkomt gelijktijdige requests. Globale cooldown van 60s na 429, gedeeld tussen camping- en water-tiles. Frontend pollt alleen, doet zelf geen Overpass calls.
+- **Water distance filter**: `/api/water-bodies` endpoint met aparte SQLite tabellen (`water_points`, `water_tiles`). Water = stranden (`natural=beach`), grote meren (relaties `natural=water,water=lake`), grote rivieren (relaties `waterway=river`). Geen coastline (te zwaar voor Overpass). Afstandsberekening via Haversine in de frontend. Filter is opt-in (disabled by default).
 - **Leaflet + React StrictMode**: kan dubbele renders geven, gebruik `useRef` voor de map instance.
 - **OSM datakwaliteit**: niet alle campings hebben alle tags. Toon altijd "onbekend" 
   als fallback, filter alleen op aanwezige tags.
