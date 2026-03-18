@@ -20,5 +20,6 @@ export interface Camping {
     capacity?: number;
     fee?: string;
     charge?: string;
+    website?: string;
   };
 }

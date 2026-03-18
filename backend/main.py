@@ -105,6 +105,7 @@ def store_tile(elements: list, tile_key: str) -> None:
                 "capacity":    int(cap) if cap.isdigit() else None,
                 "fee":         t.get("fee"),
                 "charge":      t.get("charge"),
+                "website":     t.get("website") or t.get("url"),
             }
             con.execute(
                 "INSERT OR REPLACE INTO campings (id, name, lat, lon, tags) VALUES (?, ?, ?, ?, ?)",
