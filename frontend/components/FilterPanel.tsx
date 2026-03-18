@@ -7,6 +7,7 @@ import { DEFAULT_FILTERS } from "@/types/camping";
 interface FilterPanelProps {
   filters: Filters;
   onChange: (f: Filters) => void;
+  capacityDataPct?: number; // % of campings with capacity data (for info note)
 }
 
 const FACILITIES: [keyof Pick<Filters, "dog" | "wifi" | "pool" | "electricity">, string][] = [
@@ -24,7 +25,7 @@ const SIZE_TYPES: [SizeType, string][] = [
   ["naturist", "naturist"],
 ];
 
-export default function FilterPanel({ filters, onChange }: FilterPanelProps) {
+export default function FilterPanel({ filters, onChange, capacityDataPct }: FilterPanelProps) {
   const [open, setOpen] = useState(false);
 
   const set = (patch: Partial<Filters>) => onChange({ ...filters, ...patch });
@@ -93,6 +94,11 @@ export default function FilterPanel({ filters, onChange }: FilterPanelProps) {
                 </label>
               ))}
             </div>
+            {filters.sizeType !== "all" && filters.sizeType !== "naturist" && capacityDataPct !== undefined && (
+              <div className="mt-1.5 text-xs text-gray-600">
+                {capacityDataPct}% campings heeft capaciteitsdata in OSM
+              </div>
+            )}
           </div>
 
           {/* Prijs */}

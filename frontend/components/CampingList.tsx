@@ -21,6 +21,7 @@ interface CampingListProps {
   onSelect?: (camping: Camping) => void;
   filters: Filters;
   onFiltersChange: (f: Filters) => void;
+  capacityDataPct: number;
 }
 
 export default function CampingList({
@@ -33,6 +34,7 @@ export default function CampingList({
   onSelect,
   filters,
   onFiltersChange,
+  capacityDataPct,
 }: CampingListProps) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -56,7 +58,7 @@ export default function CampingList({
         </span>
       </div>
 
-      <FilterPanel filters={filters} onChange={onFiltersChange} />
+      <FilterPanel filters={filters} onChange={onFiltersChange} capacityDataPct={capacityDataPct} />
 
       <div className="flex-1 overflow-y-auto">
         {!loading && !error && !tooFarOut && campings.length === 0 && (
