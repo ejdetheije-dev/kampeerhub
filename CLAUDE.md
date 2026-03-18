@@ -33,7 +33,9 @@ Fix marker icon bug: gebruik custom icon of importeer leaflet-defaulticon-compat
 
 ## Eurocampings links
 Altijd openen in nieuw tabblad (target="_blank")
-Deeplink formaat: https://www.eurocampings.nl/zoeken/?q={naam}
+Gebruik OSM `website`/`url` tag als primaire link indien beschikbaar.
+Fallback: https://www.eurocampings.nl/search/specific/?query={naam}+{lat}+{lon}
+Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 campings)
 
 ---
 
@@ -44,7 +46,7 @@ Deeplink formaat: https://www.eurocampings.nl/zoeken/?q={naam}
 3. **Bug fixes & cleanup** — DONE: LLM_MOCK, error handling, MapPanel StrictMode fix, local Leaflet icons, input limits, removed unused deps
 4. **Kaart** — DONE (KAM-3/KAM-11): Leaflet kaart met OSM tiles, gecentreerd op Frankrijk (46.5, 2.5) zoom 6
 5. **Overpass hook** — DONE (KAM-4): backend SQLite tile cache, `/api/campings` endpoint, frontend polling
-6. **CampingList (live data)** — DONE (KAM-6): live OSM data, tag badges, Eurocampings deeplinks
+6. **CampingList (live data)** — DONE (KAM-6): live OSM data, tag badges, gesorteerd op afstand tot kaartcentrum, OSM website tag als primaire deeplink
 7. **Pins op kaart** — DONE (KAM-5): divIcon cirkels op kaart, klikbaar; selectie gedeeld tussen kaart en lijst
 8. **Filters** — Faciliteiten, type, prijs toggles
 9. **Detail overlay** — Bij klik op camping: naam, tags, Eurocampings link
@@ -60,5 +62,5 @@ Deeplink formaat: https://www.eurocampings.nl/zoeken/?q={naam}
 - **Leaflet + React StrictMode**: kan dubbele renders geven, gebruik `useRef` voor de map instance.
 - **OSM datakwaliteit**: niet alle campings hebben alle tags. Toon altijd "onbekend" 
   als fallback, filter alleen op aanwezige tags.
-- **Eurocampings naam matching**: sommige campings hebben andere namen in OSM vs 
-  Eurocampings. Overweeg ook lat/lon-gebaseerde deeplink als backup.
+- **Eurocampings naam matching**: opgelost via OSM `website` tag als primaire link. Fallback gebruikt naam + coördinaten in Eurocampings search. Generieke namen (bijv. "camping municipal") geven anders te veel resultaten.
+- **Dev proxy**: `next.config.ts` stuurt `/api/*` door naar `http://localhost:8000` in dev mode (NODE_ENV !== production). In productie gebruikt Next.js static export zonder proxy.
