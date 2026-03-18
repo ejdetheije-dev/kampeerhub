@@ -238,10 +238,11 @@ async def fetch_water_tile(tile_key: str) -> None:
     try:
         lat, lon = map(int, tile_key.split("_"))
         query = (
-            f"[out:json][timeout:30][maxsize:2097152];\n(\n"
-            f'  way["natural"="coastline"]({lat},{lon},{lat+1},{lon+1});\n'
-            f'  way["natural"="water"]({lat},{lon},{lat+1},{lon+1});\n'
+            f"[out:json][timeout:30][maxsize:67108864];\n(\n"
             f'  node["natural"="water"]({lat},{lon},{lat+1},{lon+1});\n'
+            f'  way["natural"="water"]({lat},{lon},{lat+1},{lon+1});\n'
+            f'  node["natural"~"^(bay|strait)$"]({lat},{lon},{lat+1},{lon+1});\n'
+            f'  node["place"~"^(sea|ocean)$"]({lat},{lon},{lat+1},{lon+1});\n'
             f'  way["waterway"~"^(river|canal)$"]({lat},{lon},{lat+1},{lon+1});\n'
             f");\nout center;"
         )
@@ -259,7 +260,12 @@ async def fetch_water_tile(tile_key: str) -> None:
                 _water_tile_retry_after[tile_key] = time.time() + COOLDOWN_SECONDS
                 return
             res.raise_for_status()
-            elements = res.json().get("elements", [])
+            data = res.json()
+            if data.get("remark", "").startswith("runtime error"):
+                logger.warning("Overpass query error for water tile %s: %s", tile_key, data["remark"])
+                _water_tile_retry_after[tile_key] = time.time() + COOLDOWN_SECONDS
+                return
+            elements = data.get("elements", [])
             await asyncio.to_thread(store_water_tile, elements, tile_key)
     except Exception:
         logger.exception("Failed to fetch water tile %s", tile_key)
