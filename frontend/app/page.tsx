@@ -25,11 +25,15 @@ function minDistToWater(lat: number, lon: number, points: WaterPoint[]): number 
   return Math.min(...points.map((p) => haversine(lat, lon, p.lat, p.lon)));
 }
 
-function parseCharge(charge: string | undefined): number | null {
-  if (!charge) return null;
-  const match = charge.match(/(\d+(?:[.,]\d+)?)/);
-  if (!match) return null;
-  return parseFloat(match[1].replace(",", "."));
+function effectivePrice(c: Camping): number | null {
+  if (c.tags.fee === "no") return 0;
+  if (c.tags.charge) {
+    const match = c.tags.charge.match(/(\d+(?:[.,]\d+)?)/);
+    if (match) return parseFloat(match[1].replace(",", "."));
+  }
+  // fee=yes but no parseable charge → camping IS paid, unknown amount
+  if (c.tags.fee === "yes") return Infinity;
+  return null; // completely unknown → don't filter
 }
 
 function applyFilters(campings: Camping[], filters: Filters, waterPoints: WaterPoint[]): Camping[] {
@@ -40,20 +44,21 @@ function applyFilters(campings: Camping[], filters: Filters, waterPoints: WaterP
     if (filters.pool && !c.tags.pool) return false;
     if (filters.electricity && !c.tags.electricity) return false;
 
-    // Type filter: strict — only show campings with known matching capacity
+    // Type filter: lenient — campings without capacity data are included
+    // (per spec: "OSM tags die ontbreken worden niet meegenomen in filtering")
     if (filters.sizeType === "naturist") {
       if (!c.tags.nudism) return false;
-    } else if (filters.sizeType === "small") {
-      if (c.tags.capacity == null || c.tags.capacity >= 50) return false;
-    } else if (filters.sizeType === "medium") {
-      if (c.tags.capacity == null || c.tags.capacity < 50 || c.tags.capacity > 200) return false;
-    } else if (filters.sizeType === "large") {
-      if (c.tags.capacity == null || c.tags.capacity <= 200) return false;
+    } else if (filters.sizeType === "small" && c.tags.capacity != null) {
+      if (c.tags.capacity >= 50) return false;
+    } else if (filters.sizeType === "medium" && c.tags.capacity != null) {
+      if (c.tags.capacity < 50 || c.tags.capacity > 200) return false;
+    } else if (filters.sizeType === "large" && c.tags.capacity != null) {
+      if (c.tags.capacity <= 200) return false;
     }
 
-    // Price filter: only exclude campings with a known parseable price above the max
+    // Price filter: use fee=yes as "camping costs something" even without charge tag
     if (filters.priceMax < 80) {
-      const price = parseCharge(c.tags.charge);
+      const price = effectivePrice(c);
       if (price !== null && price > filters.priceMax) return false;
     }
 
@@ -97,6 +102,12 @@ export default function Home() {
     [filteredCampings],
   );
 
+  const capacityDataPct = useMemo(() => {
+    if (sortedCampings.length === 0) return 0;
+    const withCap = sortedCampings.filter((c) => c.tags.capacity != null).length;
+    return Math.round((withCap / sortedCampings.length) * 100);
+  }, [sortedCampings]);
+
   return (
     <div className="flex flex-col h-screen bg-[#0d1117] text-gray-100">
       <header className="flex items-center px-4 h-12 border-b border-gray-800 shrink-0">
@@ -128,6 +139,7 @@ export default function Home() {
             onSelect={handleSelectCamping}
             filters={filters}
             onFiltersChange={setFilters}
+            capacityDataPct={capacityDataPct}
           />
           <ChatPanel />
         </div>
