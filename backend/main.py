@@ -50,7 +50,9 @@ _openrouter_api_key: str | None = None
 _overpass_lock = asyncio.Lock()
 _fetching_tiles: set[str] = set()
 _fetching_water_tiles: set[str] = set()
-_tile_retry_after: dict[str, float] = {}  # tile_key -> earliest retry timestamp after 429
+_tile_retry_after: dict[str, float] = {}        # camping tile_key -> earliest retry
+_water_tile_retry_after: dict[str, float] = {}  # water tile_key -> earliest retry
+_overpass_cooldown_until: float = 0             # global cooldown after any 429
 COOLDOWN_SECONDS = 60
 
 
@@ -212,10 +214,14 @@ async def fetch_tile(tile_key: str) -> None:
         async with _overpass_lock:
             if is_tile_cached(tile_key):   # another task may have fetched it while we waited
                 return
+            global _overpass_cooldown_until
+            if time.time() < _overpass_cooldown_until:
+                return  # global cooldown active; leave tile for next retry
             async with httpx.AsyncClient(timeout=40.0) as client:
                 res = await client.post(OVERPASS_URL, data={"data": query})
             if res.status_code == 429:
                 logger.warning("Overpass rate limit hit for tile %s", tile_key)
+                _overpass_cooldown_until = time.time() + COOLDOWN_SECONDS
                 _tile_retry_after[tile_key] = time.time() + COOLDOWN_SECONDS
                 return   # leave tile uncached; retry after cooldown
             res.raise_for_status()
@@ -242,10 +248,15 @@ async def fetch_water_tile(tile_key: str) -> None:
         async with _overpass_lock:
             if is_water_tile_cached(tile_key):
                 return
+            global _overpass_cooldown_until
+            if time.time() < _overpass_cooldown_until:
+                return  # global cooldown active
             async with httpx.AsyncClient(timeout=40.0) as client:
                 res = await client.post(OVERPASS_URL, data={"data": query})
             if res.status_code == 429:
                 logger.warning("Overpass rate limit hit for water tile %s", tile_key)
+                _overpass_cooldown_until = time.time() + COOLDOWN_SECONDS
+                _water_tile_retry_after[tile_key] = time.time() + COOLDOWN_SECONDS
                 return
             res.raise_for_status()
             elements = res.json().get("elements", [])
@@ -312,13 +323,23 @@ async def water_bodies_endpoint(south: float, west: float, north: float, east: f
     if len(tiles) > MAX_TILES:
         return {"points": [], "fetching": False}
 
-    missing = [t for t in tiles if not is_water_tile_cached(t) and t not in _fetching_water_tiles]
+    now = time.time()
+    missing = [
+        t for t in tiles
+        if not is_water_tile_cached(t)
+        and t not in _fetching_water_tiles
+        and now >= _water_tile_retry_after.get(t, 0)
+    ]
     for tile in missing:
+        _water_tile_retry_after.pop(tile, None)
         _fetching_water_tiles.add(tile)
         asyncio.create_task(fetch_water_tile(tile))
 
     points = await asyncio.to_thread(get_water_points_in_bbox, south, west, north, east)
-    fetching = any(t in _fetching_water_tiles or not is_water_tile_cached(t) for t in tiles)
+    fetching = any(
+        t in _fetching_water_tiles or not is_water_tile_cached(t)
+        for t in tiles
+    )
     return {"points": points, "fetching": fetching}
 
 
