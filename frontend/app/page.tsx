@@ -34,24 +34,30 @@ function parseCharge(charge: string | undefined): number | null {
 
 function applyFilters(campings: Camping[], filters: Filters, waterPoints: WaterPoint[]): Camping[] {
   return campings.filter((c) => {
+    // Facility filters: only exclude campings that explicitly lack the feature
     if (filters.dog && !c.tags.dog) return false;
     if (filters.wifi && !c.tags.wifi) return false;
     if (filters.pool && !c.tags.pool) return false;
     if (filters.electricity && !c.tags.electricity) return false;
 
-    if (filters.sizeType === "naturist" && !c.tags.nudism) return false;
-
-    if (filters.sizeType !== "all" && filters.sizeType !== "naturist" && c.tags.capacity != null) {
-      if (filters.sizeType === "small" && c.tags.capacity >= 50) return false;
-      if (filters.sizeType === "medium" && (c.tags.capacity < 50 || c.tags.capacity > 200)) return false;
-      if (filters.sizeType === "large" && c.tags.capacity <= 200) return false;
+    // Type filter: strict — only show campings with known matching capacity
+    if (filters.sizeType === "naturist") {
+      if (!c.tags.nudism) return false;
+    } else if (filters.sizeType === "small") {
+      if (c.tags.capacity == null || c.tags.capacity >= 50) return false;
+    } else if (filters.sizeType === "medium") {
+      if (c.tags.capacity == null || c.tags.capacity < 50 || c.tags.capacity > 200) return false;
+    } else if (filters.sizeType === "large") {
+      if (c.tags.capacity == null || c.tags.capacity <= 200) return false;
     }
 
+    // Price filter: only exclude campings with a known parseable price above the max
     if (filters.priceMax < 80) {
       const price = parseCharge(c.tags.charge);
       if (price !== null && price > filters.priceMax) return false;
     }
 
+    // Water distance filter: only apply when water points have loaded
     if (filters.waterMaxKm !== null && waterPoints.length > 0) {
       const dist = minDistToWater(c.lat, c.lon, waterPoints);
       if (dist > filters.waterMaxKm) return false;
@@ -86,6 +92,11 @@ export default function Home() {
     [sortedCampings, filters, waterPoints],
   );
 
+  const filteredIds = useMemo(
+    () => new Set(filteredCampings.map((c) => c.id)),
+    [filteredCampings],
+  );
+
   return (
     <div className="flex flex-col h-screen bg-[#0d1117] text-gray-100">
       <header className="flex items-center px-4 h-12 border-b border-gray-800 shrink-0">
@@ -101,6 +112,7 @@ export default function Home() {
         <MapPanel
           onBoundsChange={setBounds}
           campings={campings}
+          filteredIds={filteredIds}
           selectedId={selectedId}
           onSelectCamping={handleSelectCamping}
         />
