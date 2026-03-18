@@ -1,6 +1,6 @@
 # plan — kampeerhub
 
-## Project Status (2026-03-18, updated after KAM-7)
+## Project Status (2026-03-18, updated after KAM-8)
 
 | Step | Status | Notes |
 |---|---|---|
@@ -12,7 +12,7 @@
 | KAM-5 Pins on map | Done | divIcon circle markers; click pin or list item to select; yellow highlight for selected |
 | KAM-6 CampingList (real data) | Done | Live OSM data, tag badges, sorted by distance to map center; website tag as primary deeplink, Eurocampings search as fallback |
 | KAM-7 Filters | Done | Uitklapbaar filterpanel: faciliteiten (honden/wifi/zwembad), type/grootte, afstand tot water slider; `/api/water-bodies` endpoint met SQLite tile cache; beaches+grote meren+grote rivieren als waterdefinitie |
-| KAM-8 Detail overlay | Not started | |
+| KAM-8 Detail overlay | Done | `DetailOverlay` component: floating panel linksonder op kaart; naam, faciliteitenbadges, capaciteit, prijs, coördinaten, website/Eurocampings/OSM links; sluit via ×-knop |
 | KAM-9 Weather widget | Not started | |
 | KAM-10 Favourites | Not started | |
 | KAM-11 Deploy | Not started | |

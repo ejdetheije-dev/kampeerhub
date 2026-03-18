@@ -49,7 +49,7 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 6. **CampingList (live data)** — DONE (KAM-6): live OSM data, tag badges, gesorteerd op afstand tot kaartcentrum, OSM website tag als primaire deeplink
 7. **Pins op kaart** — DONE (KAM-5): divIcon cirkels op kaart, klikbaar; selectie gedeeld tussen kaart en lijst
 8. **Filters** — DONE (KAM-7): uitklapbaar filterpanel (faciliteiten, type/grootte, afstand tot water slider); `/api/water-bodies` endpoint met SQLite tile cache
-9. **Detail overlay** — Bij klik op camping: naam, tags, Eurocampings link
+9. **Detail overlay** — DONE (KAM-8): floating panel linksonder op kaart; naam, faciliteitenbadges, capaciteit, prijs, coördinaten, website/Eurocampings/OSM links; `DetailOverlay` component, sluit via ×
 10. **Weer widget** — Open-Meteo per geselecteerde camping
 11. **Favorieten** — Hart-icoon + opslag
 12. **Deploy**
