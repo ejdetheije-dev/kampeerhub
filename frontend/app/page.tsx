@@ -60,6 +60,7 @@ export default function Home() {
   const [travelHours, setTravelHours] = useState<number>(0);
   const mapFlyToRef = useRef<((lat: number, lon: number, zoom: number) => void) | null>(null);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [campingNotFound, setCampingNotFound] = useState<string | null>(null);
   const { campings, loading, error, tooFarOut } = useOverpass(bounds);
   const waterPoints = useWaterBodies(bounds, filters.waterMaxKm !== null);
   const { favorites, toggleFavorite } = useFavorites();
@@ -79,8 +80,8 @@ export default function Home() {
     const clat = (bounds.north + bounds.south) / 2;
     const clon = (bounds.east + bounds.west) / 2;
     return [...campings].sort((a, b) => {
-      const da = (a.lat - clat) ** 2 + (a.lon - clon) ** 2;
-      const db = (b.lat - clat) ** 2 + (b.lon - clon) ** 2;
+      const da = haversine(a.lat, a.lon, clat, clon);
+      const db = haversine(b.lat, b.lon, clat, clon);
       return da - db;
     });
   }, [campings, bounds]);
@@ -134,6 +135,11 @@ export default function Home() {
             travelRadiusKm={travelHours > 0 ? travelHours * 90 / 1.3 : null}
             onMapReady={(fn) => { mapFlyToRef.current = fn; }}
           />
+          {campingNotFound && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1001] px-4 py-2 bg-gray-800 border border-gray-600 rounded text-xs text-gray-300 shadow-lg">
+              &quot;{campingNotFound}&quot; niet gevonden in huidige kaartweergave
+            </div>
+          )}
           {selectedCamping && (
             <DetailOverlay
               camping={selectedCamping}
@@ -171,7 +177,7 @@ export default function Home() {
                 ...(patch.dog !== undefined ? { dog: patch.dog! } : {}),
                 ...(patch.wifi !== undefined ? { wifi: patch.wifi! } : {}),
                 ...(patch.pool !== undefined ? { pool: patch.pool! } : {}),
-                ...(patch.size_type !== undefined ? { sizeType: patch.size_type as SizeType } : {}),
+                ...(patch.size_type !== undefined && (["all", "small", "medium", "large", "naturist"] as const).includes(patch.size_type as SizeType) ? { sizeType: patch.size_type as SizeType } : {}),
                 ...(patch.water_max_km !== undefined ? { waterMaxKm: patch.water_max_km } : {}),
               }))
             }
@@ -181,7 +187,13 @@ export default function Home() {
               const found = campings.find((c) =>
                 c.name.toLowerCase().includes(name.toLowerCase())
               );
-              if (found) handleSelectCamping(found);
+              if (found) {
+                handleSelectCamping(found);
+                setCampingNotFound(null);
+              } else {
+                setCampingNotFound(name);
+                setTimeout(() => setCampingNotFound(null), 4000);
+              }
             }}
           />
         </div>

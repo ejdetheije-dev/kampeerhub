@@ -4,6 +4,7 @@ import json
 import logging
 import math
 import os
+import re
 import sqlite3
 import time
 from contextlib import asynccontextmanager, closing
@@ -75,6 +76,7 @@ _tile_retry_after: dict[str, float] = {}        # camping tile_key -> earliest r
 _water_tile_retry_after: dict[str, float] = {}  # water tile_key -> earliest retry
 _overpass_cooldown_until: float = 0             # global cooldown after any 429
 COOLDOWN_SECONDS = 60
+_geocode_cache: dict[str, tuple[float, float]] = {}  # location_name -> (lat, lon)
 
 
 # --- Database ---
@@ -136,12 +138,12 @@ def store_tile(elements: list, tile_key: str) -> None:
             t = el.get("tags") or {}
             cap = t.get("capacity", "")
             tags = {
-                "dog":         t.get("dog") == "yes",
+                "dog":         t.get("dog") in ("yes", "leashed"),
                 "wifi":        t.get("internet_access") in ("wlan", "yes"),
                 "pool":        t.get("swimming_pool") == "yes",
                 "electricity": t.get("electricity") == "yes",
                 "nudism":      t.get("nudism") in ("yes", "designated"),
-                "capacity":    int(cap) if cap.isdigit() else None,
+                "capacity":    int(m.group()) if (m := re.search(r"\d+", cap)) else None,
                 "fee":         t.get("fee"),
                 "charge":      t.get("charge"),
                 "website":     t.get("website") or t.get("url"),
@@ -363,7 +365,7 @@ async def water_bodies_endpoint(south: float, west: float, north: float, east: f
 
     points = await asyncio.to_thread(get_water_points_in_bbox, south, west, north, east)
     fetching = any(
-        t in _fetching_water_tiles or not is_water_tile_cached(t)
+        t in _fetching_water_tiles or (not is_water_tile_cached(t) and now < _water_tile_retry_after.get(t, 0))
         for t in tiles
     )
     return {"points": points, "fetching": fetching}
@@ -389,7 +391,7 @@ class FiltersPayload(BaseModel):
 
 
 class NavigatePayload(BaseModel):
-    location_name: str
+    location_name: str = Field(max_length=200)
     lat: float | None = None           # filled by backend after geocoding
     lon: float | None = None
     zoom: int = 10
@@ -405,17 +407,22 @@ class ChatResponse(BaseModel):
 
 
 async def geocode(location_name: str) -> tuple[float, float] | None:
-    """Resolve a place name to (lat, lon) via Nominatim."""
+    """Resolve a place name to (lat, lon) via Nominatim, with in-process caching."""
+    key = location_name.strip().lower()
+    if key in _geocode_cache:
+        return _geocode_cache[key]
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             res = await client.get(
                 "https://nominatim.openstreetmap.org/search",
                 params={"q": location_name, "format": "json", "limit": 1},
-                headers={"User-Agent": "kampeerhub/1.0"},
+                headers={"User-Agent": "kampeerhub/1.0 (https://github.com/ejdetheije-dev/kampeerhub)"},
             )
         results = res.json()
         if results:
-            return float(results[0]["lat"]), float(results[0]["lon"])
+            coords = float(results[0]["lat"]), float(results[0]["lon"])
+            _geocode_cache[key] = coords
+            return coords
     except Exception:
         logger.warning("Geocoding failed for %r", location_name)
     return None
