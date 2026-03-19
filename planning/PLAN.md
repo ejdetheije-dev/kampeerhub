@@ -1,9 +1,9 @@
 # plan — kampeerhub
 
 ##  Huidige staat
-Laatste PR: KAM-10 Favourites ✓  
-Volgende: KAM-11 Deploy  
-Open: E2E tests (test/ directory bestaat nog niet)  
+Laatste PR: KAM-11 Deploy ✓
+Volgende: KAM-12 Reisbereik vanaf camping
+Open: E2E tests (test/ directory bestaat nog niet)
 Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8)
 
 ##  Werkwijze Claude
@@ -30,7 +30,7 @@ Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8)
 | KAM-8 Detail overlay | Done | `DetailOverlay` component: floating panel linksonder op kaart; naam, faciliteitenbadges, capaciteit, prijs, coördinaten, website/Eurocampings/OSM links; sluit via ×-knop |
 | KAM-9 Weather widget | Done | 7-daagse Open-Meteo voorspelling in DetailOverlay; max/min temp, neerslag, weerlabel per dag; timezone Europe/Paris; geen API key |
 | KAM-10 Favourites | Done | `useFavorites` hook met localStorage; hart-icoon op campingkaart en in DetailOverlay; favorieten-only filter in lijstheader |
-| KAM-11 Deploy | Not started | |
+| KAM-11 Deploy | Done | Multi-stage Docker build; venv via .venv/bin/uvicorn (geen uv run overhead) |
 | E2E tests | Not started | `test/` directory does not exist yet |
 | Backend unit tests | Not started | |
 
