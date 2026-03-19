@@ -14,9 +14,10 @@ interface MapPanelProps {
   onSelectCamping?: (camping: Camping) => void;
   reachableIds?: Set<string> | null;
   travelRadiusKm?: number | null;
+  onMapReady?: (flyTo: (lat: number, lon: number, zoom: number) => void) => void;
 }
 
-export default function MapPanel({ onBoundsChange, campings = [], filteredIds, selectedId, onSelectCamping, reachableIds, travelRadiusKm }: MapPanelProps) {
+export default function MapPanel({ onBoundsChange, campings = [], filteredIds, selectedId, onSelectCamping, reachableIds, travelRadiusKm, onMapReady }: MapPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const markersRef = useRef<LayerGroup | null>(null);
@@ -26,6 +27,8 @@ export default function MapPanel({ onBoundsChange, campings = [], filteredIds, s
   onBoundsChangeRef.current = onBoundsChange;
   const onSelectCampingRef = useRef(onSelectCamping);
   onSelectCampingRef.current = onSelectCamping;
+  const onMapReadyRef = useRef(onMapReady);
+  onMapReadyRef.current = onMapReady;
 
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return;
@@ -71,6 +74,10 @@ export default function MapPanel({ onBoundsChange, campings = [], filteredIds, s
 
       mapRef.current = map;
       leafletRef.current = L;
+
+      onMapReadyRef.current?.((lat, lon, zoom) => {
+        mapRef.current?.flyTo([lat, lon], zoom);
+      });
     });
 
     return () => {
