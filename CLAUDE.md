@@ -1,5 +1,11 @@
 # kampeerhub Project 
 
+## Werkwijze per issue
+1. Lees het issue volledig
+2. Verken relevante bestanden
+3. Toon aanpak in bullets — wacht op bevestiging
+4. Pas dan uitvoeren
+
 All project documentation is in the `planning` directory.
 
 The key document is PLAN.md included in full below; Consult this doc only when required. The remainder of the platform is still to be developed.
