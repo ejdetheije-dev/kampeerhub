@@ -58,7 +58,8 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 9. **Detail overlay** — DONE (KAM-8): floating panel linksonder op kaart; naam, faciliteitenbadges, capaciteit, prijs, coördinaten, website/Eurocampings/OSM links; `DetailOverlay` component, sluit via ×
 10. **Weer widget** — DONE (KAM-9): 7-daagse Open-Meteo voorspelling in DetailOverlay; max/min temp, neerslag, weerlabel; timezone Europe/Paris
 11. **Favorieten** — DONE (KAM-10): `useFavorites` hook (localStorage); hart-icoon op kaart en overlay; favorieten-only filter in lijstheader
-12. **Deploy**
+12. **Deploy** — DONE (KAM-11): Docker multi-stage build; `.venv/bin/uvicorn` als CMD; `skipTrailingSlashRedirect: true` in next.config.ts
+13. **Reisbereik** — DONE (KAM-12): slider 0-8u in DetailOverlay; cirkel op kaart via Leaflet ref (synchroon); vogelvlucht = reistijd × 90 / 1.3
 
 ---
 
@@ -70,4 +71,6 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 - **OSM datakwaliteit**: niet alle campings hebben alle tags. Toon altijd "onbekend" 
   als fallback, filter alleen op aanwezige tags.
 - **Eurocampings naam matching**: opgelost via OSM `website` tag als primaire link. Fallback gebruikt naam + coördinaten in Eurocampings search. Generieke namen (bijv. "camping municipal") geven anders te veel resultaten.
-- **Dev proxy**: `next.config.ts` stuurt `/api/*` door naar `http://localhost:8000` in dev mode (NODE_ENV !== production). In productie gebruikt Next.js static export zonder proxy.
+- **Dev proxy**: `next.config.ts` stuurt `/api/*` door naar `http://localhost:8000` in dev mode (NODE_ENV !== production). In productie gebruikt Next.js static export zonder proxy. `skipTrailingSlashRedirect: true` is vereist — zonder dit veroorzaakt `trailingSlash: true` een 308 redirect die de proxy omzeilt.
+- **Reisbereik cirkel**: Leaflet opslaan in ref (`leafletRef`) tijdens initialisatie zodat de circle effect synchroon tekent. `campings` NIET in de dependency array van de circle effect — anders wordt de cirkel verwijderd bij elke campings-refresh (zoomen).
+- **Haversine wegfactor**: vogelvlucht_max = reistijd × snelheid / wegfactor (dus `/1.3`, niet `*1.3`).
