@@ -130,6 +130,7 @@ export default function Home() {
             selectedId={selectedId}
             onSelectCamping={handleSelectCamping}
             reachableIds={reachableIds}
+            travelRadiusKm={travelHours > 0 ? travelHours * 90 * 1.3 : null}
           />
           {selectedCamping && (
             <DetailOverlay

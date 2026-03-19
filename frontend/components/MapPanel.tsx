@@ -2,7 +2,7 @@
 
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef } from "react";
-import type { Map as LeafletMap, LayerGroup } from "leaflet";
+import type { Map as LeafletMap, LayerGroup, Circle } from "leaflet";
 import type { Bounds, Camping } from "@/types/camping";
 
 interface MapPanelProps {
@@ -12,12 +12,14 @@ interface MapPanelProps {
   selectedId?: string | null;
   onSelectCamping?: (camping: Camping) => void;
   reachableIds?: Set<string> | null;
+  travelRadiusKm?: number | null;
 }
 
-export default function MapPanel({ onBoundsChange, campings = [], filteredIds, selectedId, onSelectCamping, reachableIds }: MapPanelProps) {
+export default function MapPanel({ onBoundsChange, campings = [], filteredIds, selectedId, onSelectCamping, reachableIds, travelRadiusKm }: MapPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const markersRef = useRef<LayerGroup | null>(null);
+  const circleRef = useRef<Circle | null>(null);
   const onBoundsChangeRef = useRef(onBoundsChange);
   onBoundsChangeRef.current = onBoundsChange;
   const onSelectCampingRef = useRef(onSelectCamping);
@@ -115,8 +117,31 @@ export default function MapPanel({ onBoundsChange, campings = [], filteredIds, s
         marker.on("click", () => onSelectCampingRef.current?.(camping));
         marker.addTo(layerGroup);
       });
+
     });
   }, [campings, filteredIds, selectedId, reachableIds]);
+
+  // Travel radius circle
+  useEffect(() => {
+    if (circleRef.current) {
+      circleRef.current.remove();
+      circleRef.current = null;
+    }
+    if (!mapRef.current) return;
+    const selected = campings.find((c) => c.id === selectedId);
+    if (!selected || !travelRadiusKm || travelRadiusKm <= 0) return;
+
+    import("leaflet").then((L) => {
+      if (!mapRef.current) return;
+      circleRef.current = L.circle([selected.lat, selected.lon], {
+        radius: travelRadiusKm * 1000,
+        color: "#ecad0a",
+        weight: 2,
+        fillColor: "#ecad0a",
+        fillOpacity: 0.08,
+      }).addTo(mapRef.current);
+    });
+  }, [campings, selectedId, travelRadiusKm]);
 
   return (
     <div className="flex-1 relative">
