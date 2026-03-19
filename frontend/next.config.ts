@@ -5,6 +5,7 @@ const isDev = process.env.NODE_ENV !== "production";
 const nextConfig: NextConfig = {
   ...(!isDev ? { output: "export" } : {}),
   trailingSlash: true,
+  skipTrailingSlashRedirect: true,
   ...(isDev
     ? {
         async rewrites() {
