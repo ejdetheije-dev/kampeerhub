@@ -3,6 +3,7 @@
 import "leaflet/dist/leaflet.css";
 import { useEffect, useRef } from "react";
 import type { Map as LeafletMap, LayerGroup, Circle } from "leaflet";
+type LeafletType = typeof import("leaflet");
 import type { Bounds, Camping } from "@/types/camping";
 
 interface MapPanelProps {
@@ -20,6 +21,7 @@ export default function MapPanel({ onBoundsChange, campings = [], filteredIds, s
   const mapRef = useRef<LeafletMap | null>(null);
   const markersRef = useRef<LayerGroup | null>(null);
   const circleRef = useRef<Circle | null>(null);
+  const leafletRef = useRef<LeafletType | null>(null);
   const onBoundsChangeRef = useRef(onBoundsChange);
   onBoundsChangeRef.current = onBoundsChange;
   const onSelectCampingRef = useRef(onSelectCamping);
@@ -68,6 +70,7 @@ export default function MapPanel({ onBoundsChange, campings = [], filteredIds, s
       markersRef.current = markers;
 
       mapRef.current = map;
+      leafletRef.current = L;
     });
 
     return () => {
@@ -121,27 +124,27 @@ export default function MapPanel({ onBoundsChange, campings = [], filteredIds, s
     });
   }, [campings, filteredIds, selectedId, reachableIds]);
 
-  // Travel radius circle
+  // Travel radius circle — synchroon via leafletRef, campings niet in deps
   useEffect(() => {
     if (circleRef.current) {
       circleRef.current.remove();
       circleRef.current = null;
     }
-    if (!mapRef.current) return;
+    const L = leafletRef.current;
+    const map = mapRef.current;
+    if (!L || !map) return;
     const selected = campings.find((c) => c.id === selectedId);
     if (!selected || !travelRadiusKm || travelRadiusKm <= 0) return;
 
-    import("leaflet").then((L) => {
-      if (!mapRef.current) return;
-      circleRef.current = L.circle([selected.lat, selected.lon], {
-        radius: travelRadiusKm * 1000,
-        color: "#ecad0a",
-        weight: 2,
-        fillColor: "#ecad0a",
-        fillOpacity: 0.08,
-      }).addTo(mapRef.current);
-    });
-  }, [campings, selectedId, travelRadiusKm]);
+    circleRef.current = L.circle([selected.lat, selected.lon], {
+      radius: travelRadiusKm * 1000,
+      color: "#ecad0a",
+      weight: 2,
+      fillColor: "#ecad0a",
+      fillOpacity: 0.08,
+    }).addTo(map);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, travelRadiusKm]);
 
   return (
     <div className="flex-1 relative">

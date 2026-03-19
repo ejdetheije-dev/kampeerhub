@@ -96,7 +96,7 @@ export default function Home() {
 
   const reachableIds = useMemo(() => {
     if (!selectedCamping || travelHours <= 0) return null;
-    const maxKm = travelHours * 90 * 1.3;
+    const maxKm = travelHours * 90 / 1.3;
     return new Set(
       campings
         .filter((c) => haversine(selectedCamping.lat, selectedCamping.lon, c.lat, c.lon) <= maxKm)
@@ -130,7 +130,7 @@ export default function Home() {
             selectedId={selectedId}
             onSelectCamping={handleSelectCamping}
             reachableIds={reachableIds}
-            travelRadiusKm={travelHours > 0 ? travelHours * 90 * 1.3 : null}
+            travelRadiusKm={travelHours > 0 ? travelHours * 90 / 1.3 : null}
           />
           {selectedCamping && (
             <DetailOverlay
