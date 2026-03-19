@@ -62,6 +62,7 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 13. **Reisbereik** — DONE (KAM-12): slider 0-8u in DetailOverlay; cirkel op kaart via Leaflet ref (synchroon); vogelvlucht = reistijd × 90 / 1.3
 14. **AI chat integratie** — DONE (KAM-13): acties navigate_map/set_filters/set_travel_range/select_camping; Nominatim geocoding; acompletion async met 3x backend retry; inputfocus na antwoord
 15. **Code review fixes** — DONE: alle CRITICAL/HIGH/MEDIUM issues uit code review opgelost (zie planning/REVIEW.md)
+16. **Knusse campings** — DONE (KAM-14): Atout France CSV import bij startup; naam-matching met OSM; cozy flag + website fallback; groen diamant-icoon op kaart; badge in lijst; enrichment via asyncio.to_thread na Overpass lock
 
 ---
 
@@ -78,8 +79,11 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 - **Haversine wegfactor**: vogelvlucht_max = reistijd × snelheid / wegfactor (dus `/1.3`, niet `*1.3`).
 - **AI chat LLM**: gebruikt `acompletion` (litellm async) met `asyncio.wait_for(timeout=9s)` en 3x retry loop. `asyncio.to_thread` NIET gebruiken — kan niet geannuleerd worden waardoor threads accumuleren. Provider: OpenRouter `gpt-oss-120b` met `allow_fallbacks: True` (Cerebras → Fireworks → Together).
 - **ChatResponse schema**: acties zijn `none|set_filters|navigate_map|set_travel_range|select_camping`. Geen prijs-gerelateerde filters — die zijn uit het project verwijderd.
-- **asyncio.to_thread**: alleen gebruiken voor SQLite reads op de hot path (`get_campings_in_bbox`, `get_water_points_in_bbox`). Niet voor writes in background tasks — die zijn snel en geserialiseerd via Lock. Zie PLAN.md voor revert-instructies.
+- **asyncio.to_thread**: gebruiken voor SQLite reads op de hot path (`get_campings_in_bbox`, `get_water_points_in_bbox`) én voor `enrich_tile_cozy` (CPU-zwaar: naam-normalisatie voor honderden campings). Niet voor `store_tile`/`store_water_tile` — die zijn snel en geserialiseerd via Lock.
 - **Geocoding cache**: `_geocode_cache` dict in geheugen voorkomt herhaalde Nominatim calls. User-Agent bevat GitHub URL conform Nominatim beleid.
+- **Atout France koppeling**: `import_atout_france_csv()` downloadt eenmalig de officiële Franse campingclassificatie CSV bij startup en slaat deze op in SQLite tabel `atout_france`. Lookup dict `_atout_france_lookup` in geheugen (genormaliseerde naam → AF data). `enrich_tile_cozy(tile_key)` loopt na elke tile-fetch via `asyncio.to_thread` (buiten de Overpass lock) en update `cozy` + `website` in de campings tabel.
+- **Knusse camping definitie**: `CLASSEMENT == "Aire naturelle"` OF (`NOMBRE D'EMPLACEMENTS < 50` EN `NOMBRE D'UNITES D'HABITATION == 0`). Alleen campings met een Atout France match krijgen `cozy: True` — buitenlandse/niet-geclassificeerde campings krijgen `cozy: False`.
+- **Naam-normalisatie**: `_normalize_camping_name()` verwijdert accenten (unicodedata NFD), lowercase, "camping"-prefix varianten, en niet-alfanumerieke tekens. Exacte dict-lookup — geen fuzzy matching.
 - **Gedeelde frontend componenten**: `TAG_LABELS` en `HeartIcon` leven in `frontend/components/shared.tsx` — niet dupliceren.
 - **Water polling**: `useWaterBodies` stopt polling zodra `fetching: false`, ook als `points.length === 0` (inland areas zijn geldige lege staat).
 - **select_camping feedback**: toont timed banner in kaartgebied als camping niet in huidig viewport gevonden wordt.

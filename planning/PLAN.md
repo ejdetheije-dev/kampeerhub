@@ -6,20 +6,23 @@ Volgende: nieuwe Jira features
 Open: E2E tests (test/ directory bestaat nog niet), LOW/INFO issues uit code review
 Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatPanel retry/timeout logica
 
-## asyncio.to_thread — ontwerpbeslissing (2026-03-19)
+## asyncio.to_thread — ontwerpbeslissing (bijgewerkt na KAM-14)
 
-`to_thread` wordt op drie plaatsen gebruikt in `backend/main.py`:
+`to_thread` wordt op vier plaatsen gebruikt in `backend/main.py`:
 
 | Locatie | Functie | Beslissing |
 |---|---|---|
-| `/api/campings` handler | `get_campings_in_bbox` (SQLite read, hot path) | **Behoudt `to_thread`** — voorkomt event loop blokkade tijdens poll |
-| `/api/water-bodies` handler | `get_water_points_in_bbox` (SQLite read, hot path) | **Behoudt `to_thread`** — zelfde reden |
+| `/api/campings` handler | `get_campings_in_bbox` (SQLite read, hot path) | **`to_thread`** — voorkomt event loop blokkade tijdens poll |
+| `/api/water-bodies` handler | `get_water_points_in_bbox` (SQLite read, hot path) | **`to_thread`** — zelfde reden |
 | `fetch_tile` background task | `store_tile` (SQLite write, background) | **Direct aangeroepen** — schrijf is snel (~1ms), lock serialiseert toch al |
-| `fetch_water_tile` background task | `store_water_tile` (SQLite write, background) | **Direct aangeroepen** — zelfde reden |
+| `fetch_tile` background task | `enrich_tile_cozy` (naam-normalisatie + SQLite update) | **`to_thread`** — CPU-zwaar bij grote tiles (100-200 campings); draait buiten de Overpass lock |
+| `fetch_water_tile` background task | `store_water_tile` (SQLite write, background) | **Direct aangeroepen** — zelfde reden als store_tile |
 
-**Reden voor wijziging writes:** `to_thread` kan niet geannuleerd worden; threads accumuleren als er veel tile-fetches tegelijk lopen. SQLite-writes zijn kort en de `asyncio.Lock` zorgt al voor serialisatie van Overpass-requests, dus gelijktijdige writes zijn praktisch uitgesloten.
+**Reden voor writes direct:** `to_thread` kan niet geannuleerd worden; bij parallelle tile-fetches accumuleren threads. SQLite-writes zijn kort en de Lock serialiseert toch al.
 
-**Terugdraaien:** vervang `store_tile(elements, tile_key)` en `store_water_tile(elements, tile_key)` terug door `await asyncio.to_thread(store_tile, elements, tile_key)` en `await asyncio.to_thread(store_water_tile, elements, tile_key)` in `fetch_tile` en `fetch_water_tile`.
+**Reden voor enrich_tile_cozy via to_thread:** naam-normalisatie (unicodedata + regex) voor honderden campings blokkeert de event loop merkbaar; draait ná de Overpass lock zodat accumulation geen probleem is.
+
+**Terugdraaien store_tile/store_water_tile:** vervang de directe aanroepen terug door `await asyncio.to_thread(store_tile, ...)` / `await asyncio.to_thread(store_water_tile, ...)`.
 
 ##  Werkwijze Claude
 1. Lees Jira issue via MCP voordat je de code aanraakt
@@ -30,7 +33,7 @@ Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatP
 6. Na elke PR: update de "Huidige staat" sectie hierboven
 7. Bij twijfel over architectuurkeuze: vraag, niet gokken
 
-## Project Status (2026-03-19, updated after KAM-13)
+## Project Status (2026-03-19, updated after KAM-14)
 
 | Step | Status | Notes |
 |---|---|---|
