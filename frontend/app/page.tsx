@@ -57,12 +57,16 @@ export default function Home() {
   const [bounds, setBounds] = useState<Bounds | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [travelHours, setTravelHours] = useState<number>(0);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const { campings, loading, error, tooFarOut } = useOverpass(bounds);
   const waterPoints = useWaterBodies(bounds, filters.waterMaxKm !== null);
   const { favorites, toggleFavorite } = useFavorites();
 
-  const handleSelectCamping = (camping: Camping) => setSelectedId(camping.id);
+  const handleSelectCamping = (camping: Camping) => {
+    setSelectedId(camping.id);
+    setTravelHours(0);
+  };
 
   const selectedCamping = useMemo(
     () => campings.find((c) => c.id === selectedId) ?? null,
@@ -90,6 +94,16 @@ export default function Home() {
     [filteredCampings],
   );
 
+  const reachableIds = useMemo(() => {
+    if (!selectedCamping || travelHours <= 0) return null;
+    const maxKm = travelHours * 90 * 1.3;
+    return new Set(
+      campings
+        .filter((c) => haversine(selectedCamping.lat, selectedCamping.lon, c.lat, c.lon) <= maxKm)
+        .map((c) => c.id),
+    );
+  }, [selectedCamping, travelHours, campings]);
+
   const capacityDataPct = useMemo(() => {
     if (sortedCampings.length === 0) return 0;
     const withCap = sortedCampings.filter((c) => c.tags.capacity != null).length;
@@ -115,13 +129,17 @@ export default function Home() {
             filteredIds={filteredIds}
             selectedId={selectedId}
             onSelectCamping={handleSelectCamping}
+            reachableIds={reachableIds}
           />
           {selectedCamping && (
             <DetailOverlay
               camping={selectedCamping}
               isFavorite={favorites.has(selectedCamping.id)}
               onToggleFavorite={() => toggleFavorite(selectedCamping.id)}
-              onClose={() => setSelectedId(null)}
+              onClose={() => { setSelectedId(null); setTravelHours(0); }}
+              travelHours={travelHours}
+              onTravelHoursChange={setTravelHours}
+              reachableCount={reachableIds ? reachableIds.size : null}
             />
           )}
         </div>

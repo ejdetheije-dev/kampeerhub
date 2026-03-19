@@ -48,9 +48,12 @@ interface DetailOverlayProps {
   isFavorite: boolean;
   onToggleFavorite: () => void;
   onClose: () => void;
+  travelHours: number;
+  onTravelHoursChange: (h: number) => void;
+  reachableCount: number | null;
 }
 
-export default function DetailOverlay({ camping, isFavorite, onToggleFavorite, onClose }: DetailOverlayProps) {
+export default function DetailOverlay({ camping, isFavorite, onToggleFavorite, onClose, travelHours, onTravelHoursChange, reachableCount }: DetailOverlayProps) {
   const { tags } = camping;
   const [forecast, setForecast] = useState<DayForecast[] | null>(null);
 
@@ -165,6 +168,27 @@ export default function DetailOverlay({ camping, isFavorite, onToggleFavorite, o
                   </div>
                 );
               })}
+            </div>
+          )}
+        </div>
+
+        <div className="border-t border-gray-800 pt-3 space-y-1">
+          <div className="flex justify-between text-gray-400">
+            <span>reisbereik (caravan)</span>
+            <span className="text-[#ecad0a]">{travelHours > 0 ? `${travelHours}u` : "uit"}</span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={8}
+            step={0.5}
+            value={travelHours}
+            onChange={(e) => onTravelHoursChange(Number(e.target.value))}
+            className="w-full accent-[#ecad0a]"
+          />
+          {reachableCount !== null && (
+            <div className="text-gray-500">
+              {reachableCount} camping{reachableCount !== 1 ? "s" : ""} bereikbaar
             </div>
           )}
         </div>

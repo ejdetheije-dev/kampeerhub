@@ -11,9 +11,10 @@ interface MapPanelProps {
   filteredIds?: Set<string>;
   selectedId?: string | null;
   onSelectCamping?: (camping: Camping) => void;
+  reachableIds?: Set<string> | null;
 }
 
-export default function MapPanel({ onBoundsChange, campings = [], filteredIds, selectedId, onSelectCamping }: MapPanelProps) {
+export default function MapPanel({ onBoundsChange, campings = [], filteredIds, selectedId, onSelectCamping, reachableIds }: MapPanelProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<LeafletMap | null>(null);
   const markersRef = useRef<LayerGroup | null>(null);
@@ -90,9 +91,10 @@ export default function MapPanel({ onBoundsChange, campings = [], filteredIds, s
       campings.forEach((camping) => {
         const isSelected = camping.id === selectedId;
         const isFiltered = hasActiveFilter && !filteredIds!.has(camping.id);
+        const outOfReach = reachableIds != null && !reachableIds.has(camping.id) && !isSelected;
         const size = isSelected ? 14 : 10;
-        const color = isSelected ? "#ecad0a" : isFiltered ? "#555" : "#209dd7";
-        const opacity = isFiltered ? 0.35 : 1;
+        const color = isSelected ? "#ecad0a" : (isFiltered || outOfReach) ? "#555" : "#209dd7";
+        const opacity = (isFiltered || outOfReach) ? 0.35 : 1;
         const icon = L.divIcon({
           className: "",
           html: `<div style="
@@ -114,7 +116,7 @@ export default function MapPanel({ onBoundsChange, campings = [], filteredIds, s
         marker.addTo(layerGroup);
       });
     });
-  }, [campings, filteredIds, selectedId]);
+  }, [campings, filteredIds, selectedId, reachableIds]);
 
   return (
     <div className="flex-1 relative">
