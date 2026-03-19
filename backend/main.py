@@ -7,6 +7,7 @@ import logging
 import math
 import os
 import re
+import secrets
 import sqlite3
 import time
 import unicodedata
@@ -16,10 +17,11 @@ from typing import Literal
 
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.staticfiles import StaticFiles
 from litellm import acompletion
 from litellm.exceptions import AuthenticationError, RateLimitError, ServiceUnavailableError, Timeout
+import bcrypt as _bcrypt_lib
 from pydantic import BaseModel, Field
 
 load_dotenv()
@@ -82,6 +84,12 @@ COOLDOWN_SECONDS = 60
 _geocode_cache: dict[str, tuple[float, float]] = {}  # location_name -> (lat, lon)
 _atout_france_lookup: dict[str, dict] = {}           # normalized name -> AF data
 
+def _hash_password(password: str) -> str:
+    return _bcrypt_lib.hashpw(password.encode(), _bcrypt_lib.gensalt()).decode()
+
+def _verify_password(password: str, hashed: str) -> bool:
+    return _bcrypt_lib.checkpw(password.encode(), hashed.encode())
+
 
 # --- Database ---
 
@@ -125,6 +133,25 @@ def init_db() -> None:
                 unites          INTEGER,
                 classement      TEXT,
                 website         TEXT
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                email        TEXT    NOT NULL UNIQUE,
+                password_hash TEXT   NOT NULL,
+                name         TEXT    NOT NULL,
+                approved     INTEGER NOT NULL DEFAULT 0,
+                is_admin     INTEGER NOT NULL DEFAULT 0,
+                last_login   TEXT,
+                created_at   TEXT    NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                token      TEXT    PRIMARY KEY,
+                user_id    INTEGER NOT NULL REFERENCES users(id),
+                created_at TEXT    NOT NULL DEFAULT (datetime('now'))
             )
         """)
         con.execute("CREATE INDEX IF NOT EXISTS idx_campings_bbox ON campings(lat, lon)")
@@ -612,6 +639,122 @@ async def chat(req: ChatRequest) -> ChatResponse:
 
 @app.get("/api/health")
 def health():
+    return {"status": "ok"}
+
+
+# --- Auth helpers ---
+
+def _get_user_by_token(token: str) -> dict | None:
+    """Return user row for a valid session token, or None."""
+    with closing(sqlite3.connect(DB_PATH)) as con:
+        con.row_factory = sqlite3.Row
+        row = con.execute(
+            "SELECT u.* FROM users u JOIN sessions s ON s.user_id = u.id WHERE s.token = ?",
+            (token,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def _require_admin(authorization: str | None) -> dict:
+    """Raise 401/403 unless the Authorization header belongs to an admin."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Niet ingelogd")
+    token = authorization.removeprefix("Bearer ")
+    user = _get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Ongeldige sessie")
+    if not user["is_admin"]:
+        raise HTTPException(status_code=403, detail="Geen beheerderstoegang")
+    return user
+
+
+# --- Auth models ---
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    name: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+# --- Auth endpoints ---
+
+@app.post("/api/auth/register")
+def register(req: RegisterRequest):
+    """Register a new user. First user becomes admin and is auto-approved."""
+    with closing(sqlite3.connect(DB_PATH)) as con:
+        con.row_factory = sqlite3.Row
+        count = con.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        is_first = count == 0
+        password_hash = _hash_password(req.password)
+        try:
+            con.execute(
+                "INSERT INTO users (email, password_hash, name, approved, is_admin) VALUES (?, ?, ?, ?, ?)",
+                (req.email, password_hash, req.name, 1 if is_first else 0, 1 if is_first else 0),
+            )
+            con.commit()
+        except sqlite3.IntegrityError:
+            raise HTTPException(status_code=409, detail="E-mailadres al in gebruik")
+    return {"status": "pending" if not is_first else "approved", "is_admin": is_first}
+
+
+@app.post("/api/auth/login")
+def login(req: LoginRequest):
+    """Login with email + password. Returns session token."""
+    with closing(sqlite3.connect(DB_PATH)) as con:
+        con.row_factory = sqlite3.Row
+        user = con.execute("SELECT * FROM users WHERE email = ?", (req.email,)).fetchone()
+        if not user or not _verify_password(req.password, user["password_hash"]):
+            raise HTTPException(status_code=401, detail="Onjuist e-mailadres of wachtwoord")
+        if not user["approved"]:
+            raise HTTPException(status_code=403, detail="Account wacht op goedkeuring")
+        token = secrets.token_urlsafe(32)
+        con.execute("INSERT INTO sessions (token, user_id) VALUES (?, ?)", (token, user["id"]))
+        con.execute(
+            "UPDATE users SET last_login = datetime('now') WHERE id = ?", (user["id"],)
+        )
+        con.commit()
+    return {"token": token, "is_admin": bool(user["is_admin"]), "name": user["name"]}
+
+
+@app.post("/api/auth/logout")
+def logout(authorization: str | None = Header(default=None)):
+    """Delete the session token."""
+    if authorization and authorization.startswith("Bearer "):
+        token = authorization.removeprefix("Bearer ")
+        with closing(sqlite3.connect(DB_PATH)) as con:
+            con.execute("DELETE FROM sessions WHERE token = ?", (token,))
+            con.commit()
+    return {"status": "ok"}
+
+
+# --- Admin endpoints ---
+
+@app.get("/api/admin/users")
+def admin_list_users(authorization: str | None = Header(default=None)):
+    """Return all users (admin only)."""
+    _require_admin(authorization)
+    with closing(sqlite3.connect(DB_PATH)) as con:
+        con.row_factory = sqlite3.Row
+        rows = con.execute(
+            "SELECT id, email, name, approved, is_admin, last_login, created_at FROM users ORDER BY created_at"
+        ).fetchall()
+    return {"users": [dict(r) for r in rows]}
+
+
+@app.patch("/api/admin/users/{user_id}")
+def admin_update_user(user_id: int, body: dict, authorization: str | None = Header(default=None)):
+    """Toggle approved for a user (admin only)."""
+    _require_admin(authorization)
+    if "approved" not in body:
+        raise HTTPException(status_code=400, detail="'approved' veld verplicht")
+    with closing(sqlite3.connect(DB_PATH)) as con:
+        con.execute("UPDATE users SET approved = ? WHERE id = ?", (1 if body["approved"] else 0, user_id))
+        con.commit()
     return {"status": "ok"}
 
 
