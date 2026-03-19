@@ -2,14 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Camping } from "@/types/camping";
-
-const TAG_LABELS: Record<string, string> = {
-  dog: "honden",
-  wifi: "wifi",
-  pool: "zwembad",
-  electricity: "stroom",
-  nudism: "naturist",
-};
+import { TAG_LABELS, HeartIcon } from "@/components/shared";
 
 function weatherLabel(code: number): string {
   if (code === 0) return "zon";
@@ -31,18 +24,6 @@ interface DayForecast {
   code: number;
 }
 
-function HeartIcon({ filled }: { filled: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={`w-4 h-4 ${filled ? "fill-[#ecad0a] stroke-[#ecad0a]" : "fill-none stroke-gray-500"}`}
-      strokeWidth={2}
-    >
-      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-    </svg>
-  );
-}
-
 interface DetailOverlayProps {
   camping: Camping;
   isFavorite: boolean;
@@ -56,9 +37,12 @@ interface DetailOverlayProps {
 export default function DetailOverlay({ camping, isFavorite, onToggleFavorite, onClose, travelHours, onTravelHoursChange, reachableCount }: DetailOverlayProps) {
   const { tags } = camping;
   const [forecast, setForecast] = useState<DayForecast[] | null>(null);
+  const [weatherError, setWeatherError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setForecast(null);
+    setWeatherError(false);
     const url =
       `https://api.open-meteo.com/v1/forecast?latitude=${camping.lat}&longitude=${camping.lon}` +
       `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode` +
@@ -78,7 +62,7 @@ export default function DetailOverlay({ camping, isFavorite, onToggleFavorite, o
         }));
         setForecast(days);
       })
-      .catch(() => {});
+      .catch(() => { if (!cancelled) setWeatherError(true); });
 
     return () => { cancelled = true; };
   }, [camping.lat, camping.lon]);
@@ -150,7 +134,9 @@ export default function DetailOverlay({ camping, isFavorite, onToggleFavorite, o
 
         {/* 7-day weather forecast */}
         <div className="border-t border-gray-800 pt-3">
-          {!forecast ? (
+          {weatherError ? (
+            <div className="text-gray-600 text-xs">weer niet beschikbaar</div>
+          ) : !forecast ? (
             <div className="text-gray-600 text-xs">weer laden...</div>
           ) : (
             <div className="grid grid-cols-7 gap-0.5 text-center">

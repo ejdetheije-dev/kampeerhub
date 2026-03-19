@@ -45,7 +45,7 @@ export function useWaterBodies(bounds: Bounds | null, enabled: boolean): WaterPo
         if (data.points.length > 0) {
           setPoints(sample(data.points));
         }
-        if (data.fetching || data.points.length === 0) {
+        if (data.fetching) {
           pollRef.current = setTimeout(() => {
             if (mountedRef.current) doFetch(b);
           }, POLL_MS);
