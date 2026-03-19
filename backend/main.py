@@ -247,7 +247,7 @@ async def fetch_tile(tile_key: str) -> None:
                 return   # leave tile uncached; retry after cooldown
             res.raise_for_status()
             elements = res.json().get("elements", [])
-            await asyncio.to_thread(store_tile, elements, tile_key)
+            store_tile(elements, tile_key)
     except Exception:
         logger.exception("Failed to fetch tile %s", tile_key)
     finally:
@@ -286,7 +286,7 @@ async def fetch_water_tile(tile_key: str) -> None:
                 _water_tile_retry_after[tile_key] = time.time() + COOLDOWN_SECONDS
                 return
             elements = data.get("elements", [])
-            await asyncio.to_thread(store_water_tile, elements, tile_key)
+            store_water_tile(elements, tile_key)
     except Exception:
         logger.exception("Failed to fetch water tile %s", tile_key)
     finally:

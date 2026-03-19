@@ -6,6 +6,21 @@ Volgende: E2E tests of nieuwe feature
 Open: E2E tests (test/ directory bestaat nog niet)
 Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatPanel retry/timeout logica
 
+## asyncio.to_thread — ontwerpbeslissing (2026-03-19)
+
+`to_thread` wordt op drie plaatsen gebruikt in `backend/main.py`:
+
+| Locatie | Functie | Beslissing |
+|---|---|---|
+| `/api/campings` handler | `get_campings_in_bbox` (SQLite read, hot path) | **Behoudt `to_thread`** — voorkomt event loop blokkade tijdens poll |
+| `/api/water-bodies` handler | `get_water_points_in_bbox` (SQLite read, hot path) | **Behoudt `to_thread`** — zelfde reden |
+| `fetch_tile` background task | `store_tile` (SQLite write, background) | **Direct aangeroepen** — schrijf is snel (~1ms), lock serialiseert toch al |
+| `fetch_water_tile` background task | `store_water_tile` (SQLite write, background) | **Direct aangeroepen** — zelfde reden |
+
+**Reden voor wijziging writes:** `to_thread` kan niet geannuleerd worden; threads accumuleren als er veel tile-fetches tegelijk lopen. SQLite-writes zijn kort en de `asyncio.Lock` zorgt al voor serialisatie van Overpass-requests, dus gelijktijdige writes zijn praktisch uitgesloten.
+
+**Terugdraaien:** vervang `store_tile(elements, tile_key)` en `store_water_tile(elements, tile_key)` terug door `await asyncio.to_thread(store_tile, elements, tile_key)` en `await asyncio.to_thread(store_water_tile, elements, tile_key)` in `fetch_tile` en `fetch_water_tile`.
+
 ##  Werkwijze Claude
 1. Lees Jira issue via MCP voordat je de code aanraakt
 2. Verken relevante bestanden
