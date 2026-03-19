@@ -60,6 +60,7 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 11. **Favorieten** — DONE (KAM-10): `useFavorites` hook (localStorage); hart-icoon op kaart en overlay; favorieten-only filter in lijstheader
 12. **Deploy** — DONE (KAM-11): Docker multi-stage build; `.venv/bin/uvicorn` als CMD; `skipTrailingSlashRedirect: true` in next.config.ts
 13. **Reisbereik** — DONE (KAM-12): slider 0-8u in DetailOverlay; cirkel op kaart via Leaflet ref (synchroon); vogelvlucht = reistijd × 90 / 1.3
+14. **AI chat integratie** — DONE (KAM-13): acties navigate_map/set_filters/set_travel_range/select_camping; Nominatim geocoding; acompletion async met 3x backend retry; inputfocus na antwoord
 
 ---
 
@@ -74,3 +75,5 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 - **Dev proxy**: `next.config.ts` stuurt `/api/*` door naar `http://localhost:8000` in dev mode (NODE_ENV !== production). In productie gebruikt Next.js static export zonder proxy. `skipTrailingSlashRedirect: true` is vereist — zonder dit veroorzaakt `trailingSlash: true` een 308 redirect die de proxy omzeilt.
 - **Reisbereik cirkel**: Leaflet opslaan in ref (`leafletRef`) tijdens initialisatie zodat de circle effect synchroon tekent. `campings` NIET in de dependency array van de circle effect — anders wordt de cirkel verwijderd bij elke campings-refresh (zoomen).
 - **Haversine wegfactor**: vogelvlucht_max = reistijd × snelheid / wegfactor (dus `/1.3`, niet `*1.3`).
+- **AI chat LLM**: gebruikt `acompletion` (litellm async) met `asyncio.wait_for(timeout=9s)` en 3x retry loop. `asyncio.to_thread` NIET gebruiken — kan niet geannuleerd worden waardoor threads accumuleren. Provider: OpenRouter `gpt-oss-120b` met `allow_fallbacks: True` (Cerebras → Fireworks → Together).
+- **ChatResponse schema**: acties zijn `none|set_filters|navigate_map|set_travel_range|select_camping`. Geen prijs-gerelateerde filters — die zijn uit het project verwijderd.

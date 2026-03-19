@@ -1,10 +1,10 @@
 # plan — kampeerhub
 
 ##  Huidige staat
-Laatste PR: KAM-12 Reisbereik ✓
+Laatste PR: KAM-13 AI chat integratie ✓
 Volgende: E2E tests of nieuwe feature
 Open: E2E tests (test/ directory bestaat nog niet)
-Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8)
+Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatPanel retry/timeout logica
 
 ##  Werkwijze Claude
 1. Lees Jira issue via MCP voordat je de code aanraakt
@@ -15,7 +15,7 @@ Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8)
 6. Na elke PR: update de "Huidige staat" sectie hierboven
 7. Bij twijfel over architectuurkeuze: vraag, niet gokken
 
-## Project Status (2026-03-18, updated after KAM-10)
+## Project Status (2026-03-19, updated after KAM-13)
 
 | Step | Status | Notes |
 |---|---|---|
@@ -32,6 +32,7 @@ Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8)
 | KAM-10 Favourites | Done | `useFavorites` hook met localStorage; hart-icoon op campingkaart en in DetailOverlay; favorieten-only filter in lijstheader |
 | KAM-11 Deploy | Done | Multi-stage Docker build; venv via .venv/bin/uvicorn (geen uv run overhead) |
 | KAM-12 Reisbereik vanaf camping | Done | Slider 0-8u in DetailOverlay; cirkel op kaart; vogelvlucht = reistijd*90/1.3; skipTrailingSlashRedirect fix voor dev proxy |
+| KAM-13 AI chat integratie | Done | navigate_map/set_filters/set_travel_range/select_camping acties; Nominatim geocoding; acompletion async met 3x retry; inputfocus na antwoord |
 | E2E tests | Not started | `test/` directory does not exist yet |
 | Backend unit tests | Not started | |
 
