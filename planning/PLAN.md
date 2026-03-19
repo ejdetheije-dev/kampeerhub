@@ -1,9 +1,9 @@
 # plan — kampeerhub
 
 ##  Huidige staat
-Laatste wijziging: KAM-17 landingspagina redesign + security fixes (CRITICAL/HIGH uit code review) ✓ (2026-03-19)
+Laatste wijziging: E2E tests toegevoegd (Playwright, 14/14 geslaagd) ✓ (2026-03-19)
 Volgende: nieuwe Jira features of resterende MEDIUM/LOW review issues
-Open: E2E tests (test/ directory bestaat nog niet), LOW/INFO issues uit code review
+Open: LOW/INFO issues uit code review, backend unit tests
 Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatPanel retry/timeout logica
 
 ## asyncio.to_thread — ontwerpbeslissing (bijgewerkt na KAM-14)
@@ -60,7 +60,7 @@ Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatP
 | KAM-16 backend flow | Done | users + sessions tabellen; register/login/logout endpoints; bcrypt direct (passlib vervangen, incompatibel met bcrypt>=4); admin list + approve/revoke; admin pagina `/admin` |
 | KAM-17 landingspagina redesign | Done | Unsplash campingfoto achtergrond; glazen kaart; alles Nederlands |
 | Security fixes (review CRITICAL+HIGH) | Done | Sessie expiry 30d; RegisterRequest validatie; AdminUpdateRequest model + 404 + admin-guard; /api/chat auth; hydration fix; water filter tooFarOut; AbortController water+weather; handleSubmit catch |
-| E2E tests | Not started | `test/` directory does not exist yet |
+| E2E tests | Done | Playwright; `test/` met globalSetup, 14 tests (auth/admin/api/app), LLM_MOCK=true, tmpfs DB |
 | Backend unit tests | Not started | |
 
 ---

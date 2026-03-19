@@ -67,6 +67,7 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 18. **Backend auth flow** — DONE (KAM-16): `users` + `sessions` tabellen; `POST /api/auth/register` (eerste gebruiker = admin + auto-approved), `POST /api/auth/login`, `POST /api/auth/logout`; bcrypt direct (passlib vervangen); `GET /api/admin/users` + `PATCH /api/admin/users/{id}` (admin-only); `/admin` pagina met gebruikerstabel en approve checkbox; `authToken` + `isAdmin` in localStorage
 19. **Landingspagina redesign** — DONE (KAM-17): Unsplash campingfoto als achtergrond, donkere overlay, glazen kaart effect; alles in Nederlands
 20. **Security fixes** — DONE: sessie tokens verlopen na 30 dagen; RegisterRequest validatie (min/max fields); AdminUpdateRequest Pydantic model + 404 guard + admin-lockout guard; `/api/chat` vereist Bearer token; hydration fix via useEffect; water slider disabled bij tooFarOut; AbortController in useWaterBodies + DetailOverlay weather; catch in handleSubmit
+21. **E2E tests** — DONE: Playwright in `test/`; `docker-compose.test.yml` (LLM_MOCK=true, tmpfs DB, poort 8001); `globalSetup.ts` maakt admin aan vóór tests; 14 tests in 4 bestanden (auth/admin/api/app); alle 14 geslaagd in ~22s
 
 ---
 
