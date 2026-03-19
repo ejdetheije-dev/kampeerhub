@@ -27,6 +27,15 @@ build/
 database/*.db
 database/*.db-shm
 database/*.db-wal
+backend/*.db
+backend/*.db-shm
+backend/*.db-wal
+
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# Debug/test screenshots (root level)
+/*.png
 
 # OS
 .DS_Store
