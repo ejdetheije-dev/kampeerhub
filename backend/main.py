@@ -1,5 +1,7 @@
 """Kampeerhub FastAPI backend."""
 import asyncio
+import csv
+import io
 import json
 import logging
 import math
@@ -7,6 +9,7 @@ import os
 import re
 import sqlite3
 import time
+import unicodedata
 from contextlib import asynccontextmanager, closing
 from pathlib import Path
 from typing import Literal
@@ -77,6 +80,7 @@ _water_tile_retry_after: dict[str, float] = {}  # water tile_key -> earliest ret
 _overpass_cooldown_until: float = 0             # global cooldown after any 429
 COOLDOWN_SECONDS = 60
 _geocode_cache: dict[str, tuple[float, float]] = {}  # location_name -> (lat, lon)
+_atout_france_lookup: dict[str, dict] = {}           # normalized name -> AF data
 
 
 # --- Database ---
@@ -114,9 +118,106 @@ def init_db() -> None:
                 fetched_at INTEGER NOT NULL
             )
         """)
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS atout_france (
+                name_normalized TEXT PRIMARY KEY,
+                emplacements    INTEGER,
+                unites          INTEGER,
+                classement      TEXT,
+                website         TEXT
+            )
+        """)
         con.execute("CREATE INDEX IF NOT EXISTS idx_campings_bbox ON campings(lat, lon)")
         con.execute("CREATE INDEX IF NOT EXISTS idx_water_points_bbox ON water_points(lat, lon)")
         con.commit()
+
+
+ATOUT_FRANCE_URL = (
+    "https://data.classement.atout-france.fr/static/exportHebergementsClasses/hebergements_classes.csv"
+)
+_AF_NAME_PREFIXES = (
+    "camping de ", "camping du ", "camping des ", "camping la ", "camping le ",
+    "camping les ", "camping l ", "camping ",
+)
+
+
+def _normalize_camping_name(name: str) -> str:
+    """Lowercase, strip accents and common prefixes, keep only alphanumeric."""
+    name = unicodedata.normalize("NFD", name)
+    name = "".join(c for c in name if unicodedata.category(c) != "Mn")
+    name = name.lower()
+    for prefix in _AF_NAME_PREFIXES:
+        if name.startswith(prefix):
+            name = name[len(prefix):]
+            break
+    name = re.sub(r"[^a-z0-9]", " ", name)
+    return re.sub(r"\s+", " ", name).strip()
+
+
+def _load_atout_france_lookup() -> None:
+    global _atout_france_lookup
+    with closing(sqlite3.connect(DB_PATH)) as con:
+        rows = con.execute(
+            "SELECT name_normalized, emplacements, unites, classement, website FROM atout_france"
+        ).fetchall()
+    _atout_france_lookup = {
+        r[0]: {"emplacements": r[1], "unites": r[2], "classement": r[3], "website": r[4]}
+        for r in rows
+    }
+    logger.info("Loaded %d Atout France campings into memory", len(_atout_france_lookup))
+
+
+async def import_atout_france_csv() -> None:
+    """Download Atout France CSV once and cache camping rows in SQLite."""
+    with closing(sqlite3.connect(DB_PATH)) as con:
+        count = con.execute("SELECT COUNT(*) FROM atout_france").fetchone()[0]
+    if count > 0:
+        _load_atout_france_lookup()
+        return
+
+    logger.info("Downloading Atout France classification CSV...")
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            res = await client.get(ATOUT_FRANCE_URL)
+        res.raise_for_status()
+    except Exception:
+        logger.warning("Failed to download Atout France CSV; cozy detection disabled")
+        return
+
+    try:
+        text = res.content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = res.content.decode("latin-1")
+
+    reader = csv.DictReader(io.StringIO(text), delimiter=";")
+    rows = []
+    for row in reader:
+        if row.get("TYPOLOGIE ÉTABLISSEMENT", "").strip().upper() != "CAMPING":
+            continue
+        name = row.get("NOM COMMERCIAL", "").strip()
+        if not name:
+            continue
+        name_norm = _normalize_camping_name(name)
+        if len(name_norm) < 3:
+            continue
+        empl_raw = row.get("NOMBRE D'EMPLACEMENTS", "").strip()
+        unit_raw = row.get("NOMBRE D'UNITES D'HABITATION (résidences de tourisme)", "").strip()
+        emplacements = int(empl_raw) if empl_raw.isdigit() else None
+        unites = int(unit_raw) if unit_raw.isdigit() else 0
+        classement = row.get("CLASSEMENT", "").strip()
+        website_raw = row.get("SITE INTERNET", "").strip()
+        website = website_raw if website_raw.startswith("http") else None
+        rows.append((name_norm, emplacements, unites, classement, website))
+
+    with closing(sqlite3.connect(DB_PATH)) as con:
+        con.executemany(
+            "INSERT OR REPLACE INTO atout_france "
+            "(name_normalized, emplacements, unites, classement, website) VALUES (?, ?, ?, ?, ?)",
+            rows,
+        )
+        con.commit()
+    logger.info("Imported %d Atout France campings", len(rows))
+    _load_atout_france_lookup()
 
 
 def is_tile_cached(tile_key: str) -> bool:
@@ -147,6 +248,7 @@ def store_tile(elements: list, tile_key: str) -> None:
                 "fee":         t.get("fee"),
                 "charge":      t.get("charge"),
                 "website":     t.get("website") or t.get("url"),
+                "cozy":        False,
             }
             con.execute(
                 "INSERT OR REPLACE INTO campings (id, name, lat, lon, tags) VALUES (?, ?, ?, ?, ?)",
@@ -156,6 +258,35 @@ def store_tile(elements: list, tile_key: str) -> None:
             "INSERT OR REPLACE INTO fetched_tiles (tile_key, fetched_at) VALUES (?, strftime('%s','now'))",
             (tile_key,),
         )
+        con.commit()
+
+
+def enrich_tile_cozy(tile_key: str) -> None:
+    """Match campings in a tile against Atout France data; update cozy flag and website fallback."""
+    if not _atout_france_lookup:
+        return
+    lat, lon = map(int, tile_key.split("_"))
+    with closing(sqlite3.connect(DB_PATH)) as con:
+        rows = con.execute(
+            "SELECT id, name, tags FROM campings "
+            "WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?",
+            (lat, lat + 1, lon, lon + 1),
+        ).fetchall()
+        updates = []
+        for camping_id, name, tags_json in rows:
+            tags = json.loads(tags_json)
+            af = _atout_france_lookup.get(_normalize_camping_name(name))
+            if af:
+                if not tags.get("website") and af.get("website"):
+                    tags["website"] = af["website"]
+                empl = af.get("emplacements")
+                unites = af.get("unites") or 0
+                classement = (af.get("classement") or "").strip().lower()
+                tags["cozy"] = classement == "aire naturelle" or (
+                    empl is not None and empl < 50 and unites == 0
+                )
+            updates.append((json.dumps(tags), camping_id))
+        con.executemany("UPDATE campings SET tags = ? WHERE id = ?", updates)
         con.commit()
 
 
@@ -250,6 +381,7 @@ async def fetch_tile(tile_key: str) -> None:
             res.raise_for_status()
             elements = res.json().get("elements", [])
             store_tile(elements, tile_key)
+        await asyncio.to_thread(enrich_tile_cozy, tile_key)
     except Exception:
         logger.exception("Failed to fetch tile %s", tile_key)
     finally:
@@ -304,6 +436,7 @@ async def lifespan(app: FastAPI):
     _openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
     if not _openrouter_api_key and os.getenv("LLM_MOCK", "").lower() != "true":
         logger.warning("OPENROUTER_API_KEY is not set and LLM_MOCK is not enabled")
+    await import_atout_france_csv()
     yield
 
 

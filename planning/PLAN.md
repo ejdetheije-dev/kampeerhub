@@ -1,7 +1,7 @@
 # plan — kampeerhub
 
 ##  Huidige staat
-Laatste wijziging: Code review fixes ✓ (2026-03-19)
+Laatste wijziging: KAM-14 knusse campings ✓ (2026-03-19)
 Volgende: nieuwe Jira features
 Open: E2E tests (test/ directory bestaat nog niet), LOW/INFO issues uit code review
 Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatPanel retry/timeout logica
@@ -52,6 +52,7 @@ Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatP
 | Code review — HIGH | Done | water polling loop fix; to_thread writes verwijderd; geocode cache + User-Agent; select_camping feedback; water fetching flag fix |
 | Code review — MEDIUM | Done | haversine sort; weather error state; TAG_LABELS/HeartIcon naar shared.tsx; capacity parser; dog=leashed; size_type validatie; location_name max_length; DATABASE_PATH gedocumenteerd |
 | Code review — LOW/INFO | Not started | Zie planning/REVIEW.md voor volledige lijst |
+| KAM-14 knusse campings | Done | Atout France CSV import; name-based matching; cozy flag; diamond icoon (groen) op kaart; badge in lijst; AF website fallback |
 | E2E tests | Not started | `test/` directory does not exist yet |
 | Backend unit tests | Not started | |
 

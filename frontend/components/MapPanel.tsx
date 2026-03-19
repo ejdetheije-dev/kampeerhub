@@ -104,20 +104,32 @@ export default function MapPanel({ onBoundsChange, campings = [], filteredIds, s
         const isSelected = camping.id === selectedId;
         const isFiltered = hasActiveFilter && !filteredIds!.has(camping.id);
         const outOfReach = reachableIds != null && !reachableIds.has(camping.id) && !isSelected;
+        const isCozy = camping.tags?.cozy === true;
         const size = isSelected ? 14 : 10;
-        const color = isSelected ? "#ecad0a" : (isFiltered || outOfReach) ? "#555" : "#209dd7";
-        const opacity = (isFiltered || outOfReach) ? 0.35 : 1;
+        const dimmed = isFiltered || outOfReach;
+        const color = isSelected ? "#ecad0a" : dimmed ? "#555" : isCozy ? "#4caf50" : "#209dd7";
+        const opacity = dimmed ? 0.35 : 1;
         const icon = L.divIcon({
           className: "",
-          html: `<div style="
-            width:${size}px;
-            height:${size}px;
-            border-radius:50%;
-            background:${color};
-            border:2px solid ${isSelected ? "#fff" : "#0d1117"};
-            box-shadow:0 0 4px rgba(0,0,0,0.5);
-            opacity:${opacity};
-          "></div>`,
+          html: isCozy
+            ? `<div style="
+                width:${size}px;
+                height:${size}px;
+                background:${color};
+                border:2px solid ${isSelected ? "#fff" : "#0d1117"};
+                box-shadow:0 0 4px rgba(0,0,0,0.5);
+                opacity:${opacity};
+                transform:rotate(45deg);
+              "></div>`
+            : `<div style="
+                width:${size}px;
+                height:${size}px;
+                border-radius:50%;
+                background:${color};
+                border:2px solid ${isSelected ? "#fff" : "#0d1117"};
+                box-shadow:0 0 4px rgba(0,0,0,0.5);
+                opacity:${opacity};
+              "></div>`,
           iconSize: [size, size],
           iconAnchor: [size / 2, size / 2],
         });
