@@ -34,6 +34,11 @@ backend/*.db-wal
 # Playwright MCP artifacts
 .playwright-mcp/
 
+# Playwright E2E test output
+test/playwright-report/
+test/test-results/
+test/tests/.auth-state.json
+
 # Debug/test screenshots (root level)
 /*.png
 
