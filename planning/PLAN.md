@@ -1,9 +1,9 @@
 # plan — kampeerhub
 
 ##  Huidige staat
-Laatste PR: KAM-13 AI chat integratie ✓
-Volgende: E2E tests of nieuwe feature
-Open: E2E tests (test/ directory bestaat nog niet)
+Laatste wijziging: Code review fixes ✓ (2026-03-19)
+Volgende: nieuwe Jira features
+Open: E2E tests (test/ directory bestaat nog niet), LOW/INFO issues uit code review
 Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatPanel retry/timeout logica
 
 ## asyncio.to_thread — ontwerpbeslissing (2026-03-19)
@@ -48,6 +48,10 @@ Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatP
 | KAM-11 Deploy | Done | Multi-stage Docker build; venv via .venv/bin/uvicorn (geen uv run overhead) |
 | KAM-12 Reisbereik vanaf camping | Done | Slider 0-8u in DetailOverlay; cirkel op kaart; vogelvlucht = reistijd*90/1.3; skipTrailingSlashRedirect fix voor dev proxy |
 | KAM-13 AI chat integratie | Done | navigate_map/set_filters/set_travel_range/select_camping acties; Nominatim geocoding; acompletion async met 3x retry; inputfocus na antwoord |
+| Code review — CRITICAL | Done | dev.db + playwright artifacts uit git verwijderd; .dockerignore toegevoegd |
+| Code review — HIGH | Done | water polling loop fix; to_thread writes verwijderd; geocode cache + User-Agent; select_camping feedback; water fetching flag fix |
+| Code review — MEDIUM | Done | haversine sort; weather error state; TAG_LABELS/HeartIcon naar shared.tsx; capacity parser; dog=leashed; size_type validatie; location_name max_length; DATABASE_PATH gedocumenteerd |
+| Code review — LOW/INFO | Not started | Zie planning/REVIEW.md voor volledige lijst |
 | E2E tests | Not started | `test/` directory does not exist yet |
 | Backend unit tests | Not started | |
 
