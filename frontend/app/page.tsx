@@ -54,7 +54,7 @@ function applyFilters(campings: Camping[], filters: Filters, waterPoints: WaterP
   });
 }
 
-function AppContent() {
+function AppContent({ isAdmin, onLogout }: { isAdmin: boolean; onLogout: () => void }) {
   const [bounds, setBounds] = useState<Bounds | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
@@ -122,6 +122,10 @@ function AppContent() {
           className={`ml-auto w-2 h-2 rounded-full ${error ? "bg-red-400" : loading ? "bg-yellow-400" : "bg-green-400"}`}
           title={error ? "fout" : loading ? "laden..." : "verbonden"}
         />
+        {isAdmin && (
+          <a href="/admin" className="ml-4 text-xs text-gray-500 hover:text-gray-300 transition-colors">beheer</a>
+        )}
+        <button onClick={onLogout} className="ml-4 text-xs text-gray-500 hover:text-gray-300 transition-colors">uitloggen</button>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
@@ -204,19 +208,32 @@ function AppContent() {
 }
 
 export default function Home() {
-  const [loggedIn, setLoggedIn] = useState<boolean>(() => {
+  const [authToken, setAuthToken] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("authToken");
+  });
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
-    return localStorage.getItem("loggedIn") === "true";
+    return localStorage.getItem("isAdmin") === "true";
   });
 
-  function handleEnter() {
-    localStorage.setItem("loggedIn", "true");
-    setLoggedIn(true);
+  function handleEnter(token: string, admin: boolean, name: string) {
+    localStorage.setItem("authToken", token);
+    localStorage.setItem("isAdmin", String(admin));
+    localStorage.setItem("userName", name);
+    setAuthToken(token);
+    setIsAdmin(admin);
   }
 
-  if (!loggedIn) {
+  if (!authToken) {
     return <LandingPage onEnter={handleEnter} />;
   }
 
-  return <AppContent />;
+  return <AppContent isAdmin={isAdmin} onLogout={() => {
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("isAdmin");
+    localStorage.removeItem("userName");
+    setAuthToken(null);
+    setIsAdmin(false);
+  }} />;
 }

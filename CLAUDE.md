@@ -64,6 +64,7 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 15. **Code review fixes** — DONE: alle CRITICAL/HIGH/MEDIUM issues uit code review opgelost (zie planning/REVIEW.md)
 16. **Knusse campings** — DONE (KAM-14): Atout France CSV import bij startup; naam-matching met OSM; cozy flag + website fallback; groen diamant-icoon op kaart; badge in lijst; enrichment via asyncio.to_thread na Overpass lock
 17. **Landingspagina** — DONE (KAM-15): `LandingPage` component; login/aanmelden tabs (MVP zonder auth); `localStorage.loggedIn` flag; `AppContent` los van `Home` in page.tsx
+18. **Backend auth flow** — DONE (KAM-16): `users` + `sessions` tabellen; `POST /api/auth/register` (eerste gebruiker = admin + auto-approved), `POST /api/auth/login`, `POST /api/auth/logout`; passlib bcrypt; `GET /api/admin/users` + `PATCH /api/admin/users/{id}` (admin-only); `/admin` pagina met gebruikerstabel en approve checkbox; `authToken` + `isAdmin` in localStorage
 
 ---
 
