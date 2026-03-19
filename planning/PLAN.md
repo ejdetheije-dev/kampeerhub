@@ -1,5 +1,20 @@
 # plan — kampeerhub
 
+##  Huidige staat
+Laatste PR: KAM-10 Favourites ✓  
+Volgende: KAM-11 Deploy  
+Open: E2E tests (test/ directory bestaat nog niet)  
+Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8)
+
+##  Werkwijze Claude
+1. Lees Jira issue via MCP voordat je de code aanraakt
+2. Verken relevante bestanden
+3. Toon aanpak in 3-5 bullets — wacht op bevestiging
+4. Voer uit, commit, update "Huidige staat" hierboven
+5. Bij wijziging >3 bestanden: altijd eerst vragen
+6. Na elke PR: update de "Huidige staat" sectie hierboven
+7. Bij twijfel over architectuurkeuze: vraag, niet gokken
+
 ## Project Status (2026-03-18, updated after KAM-10)
 
 | Step | Status | Notes |
