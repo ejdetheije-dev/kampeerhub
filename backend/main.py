@@ -151,9 +151,15 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS sessions (
                 token      TEXT    PRIMARY KEY,
                 user_id    INTEGER NOT NULL REFERENCES users(id),
-                created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+                created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+                expires_at TEXT    NOT NULL DEFAULT (datetime('now', '+30 days'))
             )
         """)
+        # Migrate existing sessions table: add expires_at if absent
+        try:
+            con.execute("ALTER TABLE sessions ADD COLUMN expires_at TEXT NOT NULL DEFAULT (datetime('now', '+30 days'))")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
         con.execute("CREATE INDEX IF NOT EXISTS idx_campings_bbox ON campings(lat, lon)")
         con.execute("CREATE INDEX IF NOT EXISTS idx_water_points_bbox ON water_points(lat, lon)")
         con.commit()
@@ -589,7 +595,8 @@ async def geocode(location_name: str) -> tuple[float, float] | None:
 
 
 @app.post("/api/chat")
-async def chat(req: ChatRequest) -> ChatResponse:
+async def chat(req: ChatRequest, authorization: str | None = Header(default=None)) -> ChatResponse:
+    _require_session(authorization)
     """Call the LLM and return a structured response."""
     if os.getenv("LLM_MOCK", "").lower() == "true":
         return ChatResponse.model_validate_json(MOCK_RESPONSE)
@@ -645,14 +652,28 @@ def health():
 # --- Auth helpers ---
 
 def _get_user_by_token(token: str) -> dict | None:
-    """Return user row for a valid session token, or None."""
+    """Return user row for a valid, non-expired session token, or None."""
     with closing(sqlite3.connect(DB_PATH)) as con:
         con.row_factory = sqlite3.Row
         row = con.execute(
-            "SELECT u.* FROM users u JOIN sessions s ON s.user_id = u.id WHERE s.token = ?",
+            "SELECT u.* FROM users u JOIN sessions s ON s.user_id = u.id"
+            " WHERE s.token = ? AND s.expires_at > datetime('now')",
             (token,),
         ).fetchone()
     return dict(row) if row else None
+
+
+def _require_session(authorization: str | None) -> dict:
+    """Raise 401 unless the Authorization header contains a valid session token."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Niet ingelogd")
+    token = authorization.removeprefix("Bearer ")
+    user = _get_user_by_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="Ongeldige sessie")
+    if not user["approved"]:
+        raise HTTPException(status_code=403, detail="Account wacht op goedkeuring")
+    return user
 
 
 def _require_admin(authorization: str | None) -> dict:
@@ -671,9 +692,9 @@ def _require_admin(authorization: str | None) -> dict:
 # --- Auth models ---
 
 class RegisterRequest(BaseModel):
-    email: str
-    password: str
-    name: str
+    email: str = Field(min_length=3, max_length=254)
+    password: str = Field(min_length=8, max_length=72)
+    name: str = Field(min_length=1, max_length=200)
 
 
 class LoginRequest(BaseModel):
@@ -713,10 +734,12 @@ def login(req: LoginRequest):
         if not user["approved"]:
             raise HTTPException(status_code=403, detail="Account wacht op goedkeuring")
         token = secrets.token_urlsafe(32)
-        con.execute("INSERT INTO sessions (token, user_id) VALUES (?, ?)", (token, user["id"]))
         con.execute(
-            "UPDATE users SET last_login = datetime('now') WHERE id = ?", (user["id"],)
+            "INSERT INTO sessions (token, user_id, expires_at) VALUES (?, ?, datetime('now', '+30 days'))",
+            (token, user["id"]),
         )
+        con.execute("UPDATE users SET last_login = datetime('now') WHERE id = ?", (user["id"],))
+        con.execute("DELETE FROM sessions WHERE expires_at < datetime('now')")
         con.commit()
     return {"token": token, "is_admin": bool(user["is_admin"]), "name": user["name"]}
 
@@ -746,14 +769,21 @@ def admin_list_users(authorization: str | None = Header(default=None)):
     return {"users": [dict(r) for r in rows]}
 
 
+class AdminUpdateRequest(BaseModel):
+    approved: bool
+
+
 @app.patch("/api/admin/users/{user_id}")
-def admin_update_user(user_id: int, body: dict, authorization: str | None = Header(default=None)):
-    """Toggle approved for a user (admin only)."""
+def admin_update_user(user_id: int, body: AdminUpdateRequest, authorization: str | None = Header(default=None)):
+    """Toggle approved for a user (admin only). Admins cannot be modified."""
     _require_admin(authorization)
-    if "approved" not in body:
-        raise HTTPException(status_code=400, detail="'approved' veld verplicht")
     with closing(sqlite3.connect(DB_PATH)) as con:
-        con.execute("UPDATE users SET approved = ? WHERE id = ?", (1 if body["approved"] else 0, user_id))
+        target = con.execute("SELECT is_admin FROM users WHERE id = ?", (user_id,)).fetchone()
+        if target is None:
+            raise HTTPException(status_code=404, detail="Gebruiker niet gevonden")
+        if target[0]:
+            raise HTTPException(status_code=400, detail="Beheerdersaccounts kunnen niet worden gewijzigd")
+        con.execute("UPDATE users SET approved = ? WHERE id = ?", (1 if body.approved else 0, user_id))
         con.commit()
     return {"status": "ok"}
 

@@ -66,7 +66,7 @@ export default function CampingList({
         </button>
       </div>
 
-      <FilterPanel filters={filters} onChange={onFiltersChange} capacityDataPct={capacityDataPct} />
+      <FilterPanel filters={filters} onChange={onFiltersChange} capacityDataPct={capacityDataPct} tooFarOut={tooFarOut} />
 
       <div className="flex-1 overflow-y-auto">
         {!loading && !error && !tooFarOut && campings.length === 0 && (

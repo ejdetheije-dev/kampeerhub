@@ -8,6 +8,7 @@ interface FilterPanelProps {
   filters: Filters;
   onChange: (f: Filters) => void;
   capacityDataPct: number;
+  tooFarOut: boolean;
 }
 
 const FACILITIES: [keyof Pick<Filters, "dog" | "wifi" | "pool">, string][] = [
@@ -24,7 +25,7 @@ const SIZE_TYPES: [SizeType, string][] = [
   ["naturist", "naturist"],
 ];
 
-export default function FilterPanel({ filters, onChange, capacityDataPct }: FilterPanelProps) {
+export default function FilterPanel({ filters, onChange, capacityDataPct, tooFarOut }: FilterPanelProps) {
   const [open, setOpen] = useState(false);
 
   const set = (patch: Partial<Filters>) => onChange({ ...filters, ...patch });
@@ -101,20 +102,24 @@ export default function FilterPanel({ filters, onChange, capacityDataPct }: Filt
           {/* Afstand tot water */}
           <div>
             <div className="text-xs text-gray-500 mb-1.5 flex items-center gap-2">
-              <label className="flex items-center gap-1.5 cursor-pointer">
+              <label className={`flex items-center gap-1.5 ${tooFarOut ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}>
                 <input
                   type="checkbox"
                   checked={filters.waterMaxKm !== null}
+                  disabled={tooFarOut}
                   onChange={(e) => set({ waterMaxKm: e.target.checked ? 5 : null })}
                   className="accent-[#209dd7]"
                 />
                 <span className="text-gray-300">Afstand tot water</span>
               </label>
-              {filters.waterMaxKm !== null && (
+              {filters.waterMaxKm !== null && !tooFarOut && (
                 <span className="text-gray-400">&lt;{filters.waterMaxKm} km</span>
               )}
             </div>
-            {filters.waterMaxKm !== null && (
+            {tooFarOut && (
+              <p className="text-xs text-gray-600 italic">Zoom in om dit filter te gebruiken</p>
+            )}
+            {filters.waterMaxKm !== null && !tooFarOut && (
               <input
                 type="range"
                 min={1}

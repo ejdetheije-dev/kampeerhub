@@ -9,8 +9,8 @@ export interface WaterPoint {
 }
 
 const POLL_MS = 5000;
-// Keep one representative point per ~1km cell to reduce computation load
-const GRID_DEG = 0.02; // ~2km grid — keeps precision while cutting point count ~5x
+// Keep one representative point per ~2km cell to reduce computation load
+const GRID_DEG = 0.02;
 
 function sample(points: WaterPoint[]): WaterPoint[] {
   const seen = new Set<string>();
@@ -27,18 +27,24 @@ export function useWaterBodies(bounds: Bounds | null, enabled: boolean): WaterPo
   const prevKeyRef = useRef<string>("");
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       if (pollRef.current) clearTimeout(pollRef.current);
+      if (abortRef.current) abortRef.current.abort();
     };
   }, []);
 
   const doFetch = useCallback((b: Bounds) => {
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     const { south, west, north, east } = b;
-    fetch(`/api/water-bodies?south=${south}&west=${west}&north=${north}&east=${east}`)
+    fetch(`/api/water-bodies?south=${south}&west=${west}&north=${north}&east=${east}`, { signal: controller.signal })
       .then((r) => r.json())
       .then((data: { points: WaterPoint[]; fetching: boolean }) => {
         if (!mountedRef.current) return;
@@ -51,7 +57,8 @@ export function useWaterBodies(bounds: Bounds | null, enabled: boolean): WaterPo
           }, POLL_MS);
         }
       })
-      .catch(() => {
+      .catch((err) => {
+        if (err.name === "AbortError") return;
         if (mountedRef.current) {
           pollRef.current = setTimeout(() => doFetch(b), POLL_MS);
         }
@@ -60,6 +67,7 @@ export function useWaterBodies(bounds: Bounds | null, enabled: boolean): WaterPo
 
   useEffect(() => {
     if (pollRef.current) clearTimeout(pollRef.current);
+    if (abortRef.current) { abortRef.current.abort(); abortRef.current = null; }
 
     if (!bounds || !enabled) {
       setPoints([]);

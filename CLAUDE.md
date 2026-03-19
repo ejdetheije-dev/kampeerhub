@@ -65,6 +65,8 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 16. **Knusse campings** — DONE (KAM-14): Atout France CSV import bij startup; naam-matching met OSM; cozy flag + website fallback; groen diamant-icoon op kaart; badge in lijst; enrichment via asyncio.to_thread na Overpass lock
 17. **Landingspagina** — DONE (KAM-15): `LandingPage` component; login/aanmelden tabs (MVP zonder auth); `localStorage.loggedIn` flag; `AppContent` los van `Home` in page.tsx
 18. **Backend auth flow** — DONE (KAM-16): `users` + `sessions` tabellen; `POST /api/auth/register` (eerste gebruiker = admin + auto-approved), `POST /api/auth/login`, `POST /api/auth/logout`; bcrypt direct (passlib vervangen); `GET /api/admin/users` + `PATCH /api/admin/users/{id}` (admin-only); `/admin` pagina met gebruikerstabel en approve checkbox; `authToken` + `isAdmin` in localStorage
+19. **Landingspagina redesign** — DONE (KAM-17): Unsplash campingfoto als achtergrond, donkere overlay, glazen kaart effect; alles in Nederlands
+20. **Security fixes** — DONE: sessie tokens verlopen na 30 dagen; RegisterRequest validatie (min/max fields); AdminUpdateRequest Pydantic model + 404 guard + admin-lockout guard; `/api/chat` vereist Bearer token; hydration fix via useEffect; water slider disabled bij tooFarOut; AbortController in useWaterBodies + DetailOverlay weather; catch in handleSubmit
 
 ---
 
@@ -92,3 +94,7 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 - **Capaciteit parsing**: `re.search(r"\d+", cap)` pakt eerste getal uit waardes als "150-200" of "~100".
 - **Dog filter**: `dog in ("yes", "leashed")` — leashed is ook toegestaan.
 - **Wachtwoord hashing**: gebruik `bcrypt` direct (`import bcrypt`), niet `passlib`. Passlib is incompatibel met bcrypt>=4.0 (`detect_wrap_bug` crasht met ValueError over password >72 bytes).
+- **Sessie tokens**: verlopen na 30 dagen (`expires_at` kolom in `sessions` tabel). `_get_user_by_token` filtert op `expires_at > datetime('now')`. Cleanup van verlopen tokens bij elke login.
+- **Water filter + zoom**: `FilterPanel` ontvangt `tooFarOut` prop; water checkbox is disabled + toont uitleg als kaart niet ingezoomd is. Bounding box bij zoom < 9 bevat >16 tiles → water endpoint geeft leeg terug.
+- **Auth op /api/chat**: `_require_session()` helper vereist geldig Bearer token. `ChatPanel` stuurt `authToken` mee via Authorization header.
+- **Hydration fix**: `Home` component leest `localStorage` via `useEffect`, niet in `useState` initializer — voorkomt mismatch tussen server-rendered HTML en client.

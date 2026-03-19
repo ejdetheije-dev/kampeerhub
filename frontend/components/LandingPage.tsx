@@ -39,6 +39,8 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
       } else {
         await doLogin();
       }
+    } catch {
+      setError("Er is een fout opgetreden. Controleer je verbinding en probeer opnieuw.");
     } finally {
       setPending(false);
     }

@@ -1,8 +1,206 @@
-# Code Review — kampeerhub
+# Code Review — kampeerhub (2026-03-19)
 
-Review date: 2026-03-19
-Reviewer: Claude Sonnet 4.6
-Scope: Full codebase after KAM-13 (current HEAD), reviewed against PLAN.md
+Reviewed files: `backend/main.py`, `frontend/app/page.tsx`, `frontend/app/admin/page.tsx`,
+`frontend/components/LandingPage.tsx`, `frontend/components/MapPanel.tsx`,
+`frontend/components/ChatPanel.tsx`, `frontend/components/CampingList.tsx`,
+`frontend/components/DetailOverlay.tsx`, `frontend/components/FilterPanel.tsx`,
+`frontend/components/shared.tsx`, `frontend/hooks/useOverpass.ts`,
+`frontend/hooks/useWaterBodies.ts`, `frontend/hooks/useFavorites.ts`,
+`frontend/types/camping.ts`, `Dockerfile`, `.dockerignore`, `.gitignore`.
+
+---
+
+## CRITICAL
+
+### C-1 — Session tokens never expire (`backend/main.py`, lines 150–156)
+The `sessions` table has no expiry column and no cleanup mechanism. A token issued at
+registration remains valid indefinitely. If a token leaks (browser storage, logs, network
+intercept) an attacker has permanent access. There is no side-effect on logout that invalidates
+old sessions for the same user either — only the specific token sent in the logout call is
+deleted.
+Fix: add an `expires_at` column (e.g. `datetime('now', '+30 days')`), filter expired rows in
+`_get_user_by_token`, and add a `DELETE ... WHERE expires_at < datetime('now')` on every lookup
+or a periodic cleanup task.
+
+### C-2 — No input validation on `RegisterRequest` (`backend/main.py`, lines 673–677)
+`email`, `password`, and `name` are plain `str` fields with no length, format, or content
+constraints. Consequences:
+- A blank password is accepted and bcrypt-hashed; accounts can be created with empty passwords.
+- Passwords longer than 72 characters all hash identically in bcrypt (bcrypt silently truncates
+  at 72 bytes), creating a collision class for long passwords.
+- An arbitrarily long name or email string can be stored, wasting DB space and potentially
+  causing unexpected behaviour downstream.
+Fix: use `pydantic.EmailStr` for email, `Field(min_length=8, max_length=72)` for password,
+`Field(min_length=1, max_length=200)` for name.
+
+### C-3 — `admin_update_user` accepts an unvalidated dict body (`backend/main.py`, lines 750–758)
+The PATCH endpoint declares `body: dict`, so FastAPI accepts any valid JSON object. No Pydantic
+model validates the shape. Additionally:
+- `1 if body["approved"] else 0` trusts any truthy value including strings.
+- No check that `user_id` actually exists; the `UPDATE` silently affects zero rows and returns
+  `{"status": "ok"}` for any non-existent id.
+Fix: replace `body: dict` with a typed Pydantic model; verify affected row count; return 404
+if the user does not exist.
+
+### C-4 — Admin can lock out the only admin account (`backend/main.py`, lines 749–758)
+`PATCH /api/admin/users/{id}` allows setting `approved=false` for any user, including admins.
+The `is_admin` flag and the `approved` flag are separate columns; revoking `approved` from the
+sole admin would block that admin's login permanently. The frontend disables the checkbox for
+admins (`disabled={!!u.is_admin}`) but the backend has no equivalent guard.
+Fix: in the endpoint, skip or reject updates on rows where `is_admin = 1`.
+
+---
+
+## HIGH
+
+### H-1 — `authToken` stored in `localStorage` is vulnerable to XSS (`frontend/app/page.tsx`, lines 211–218)
+The session token is stored in `localStorage`. Any XSS payload in any script on the same
+origin (third-party analytics, CDN-served libraries) can read the token with one
+`localStorage.getItem` call. An `HttpOnly` cookie would be immune to this. For an app that
+serves the frontend from the same origin as the API this is straightforward to fix.
+
+### H-2 — `doLogin` error in register flow causes unhandled rejection (`frontend/components/LandingPage.tsx`, lines 23–44)
+`handleSubmit` has a `try/finally` with no `catch`. When `doLogin` is called for an
+auto-approved first-user registration and the subsequent login request fails (e.g. network
+error), the thrown error propagates out of the `try` block uncaught. The `finally` still runs
+(`setPending(false)`), but no `setError` call fires, leaving the user on a blank form with no
+error message and no indication of what went wrong. Add a `catch` clause to `handleSubmit`.
+
+### H-3 — Weather fetch has no timeout (`frontend/components/DetailOverlay.tsx`, lines 46–65)
+The Open-Meteo fetch in `DetailOverlay` has no `AbortController` timeout. A very slow response
+leaves the weather widget in "laden..." state indefinitely. Every other external fetch in the
+codebase (`useOverpass`, `ChatPanel`) uses an abort controller. Apply the same pattern here.
+
+### H-4 — `useWaterBodies` in-flight fetches cannot be cancelled on bounds change (`frontend/hooks/useWaterBodies.ts`, lines 39–58)
+`doFetch` uses a plain `fetch` with no `signal`. When the map pans, the effect cleanup clears
+`pollRef` but cannot cancel any fetch already in flight. Multiple concurrent fetches can call
+`setPoints` in arbitrary order, potentially overwriting newer data with stale results. Apply
+the `AbortController` pattern from `useOverpass`.
+
+### H-5 — `POST /api/chat` is unauthenticated, incurring LLM cost for anonymous callers (`backend/main.py`, lines 591–637)
+The `/api/chat` endpoint requires no Bearer token. Any party who discovers the endpoint URL
+can send unlimited LLM requests, consuming OpenRouter credits. Given that the rest of the app
+requires authentication, this inconsistency is likely unintentional.
+Fix: add a `_require_session` helper (analogous to `_require_admin`) and apply it to the chat
+endpoint.
+
+### H-6 — No CSRF protection (noted for future cookie migration)
+Currently mitigated because tokens are in `localStorage` (not cookies), so cross-origin
+requests cannot include them. However, `SameSite` cookie enforcement and CSRF tokens will be
+mandatory if tokens are ever migrated to `HttpOnly` cookies. Document this as a precondition
+for the cookie migration.
+
+---
+
+## MEDIUM
+
+### M-1 — `enrich_tile_cozy` writes all campings in a tile even when nothing changed (`backend/main.py`, lines 291–317)
+Line 315 (`updates.append(...)`) is outside the `if af:` block, so every camping in a tile
+is re-written on every enrich run, even campings with no Atout France match. On a large tile
+this is unnecessary write amplification. Move the append inside the `if af:` block.
+
+### M-2 — Size filter silently passes campings with no capacity data (`frontend/app/page.tsx`, lines 41–47)
+When `sizeType` is `"small"`, `"medium"`, or `"large"`, campings without a `capacity` tag
+pass through unconditionally. The aggregate warning (`capacityDataPct`) exists but is easy to
+miss. Users choosing a size filter may see campings of any actual size. Consider documenting
+this limitation more prominently in the UI or changing the filter to explicitly exclude
+unknown-capacity campings.
+
+### M-3 — `applyFilters` "large" boundary excludes capacity == 200 (`frontend/app/page.tsx`, lines 45–46)
+The condition for "large" is `c.tags.capacity <= 200 → return false`, meaning a camping with
+exactly 200 places fails the large filter. The `FilterPanel` label says ">200", which is
+consistent — but the "medium" upper boundary `c.tags.capacity > 200` means 200 is medium. A
+camping with exactly 200 places is classified as medium, not large. Whether this is intentional
+needs to be confirmed and documented.
+
+### M-4 — `store_water_tile` does not delete existing points before inserting (`backend/main.py`, lines 339–354)
+`water_points` uses plain `INSERT` (no `OR REPLACE`). If a tile is somehow re-fetched after
+a partial DB reset (water_tiles cleared, water_points not), duplicate rows accumulate. Add a
+`DELETE FROM water_points WHERE tile_key = ?` before the inserts to make the function
+idempotent.
+
+### M-5 — `LandingPage` background image fetched from Unsplash on every visit (`frontend/components/LandingPage.tsx`, line 70)
+The hardcoded Unsplash URL loads a 1920px JPEG from an external CDN on every page view. This
+leaks user IPs to Unsplash (privacy concern) and fails silently when Unsplash is unreachable.
+Bundle the image as a local asset or add a CSS background-color fallback.
+
+### M-6 — `size_type` field in `FiltersPayload` accepts any string (`backend/main.py`, line 549)
+`size_type: str | None` should be `Literal["all", "small", "medium", "large", "naturist"] | None`
+to reject invalid values at the Pydantic validation layer rather than silently ignoring them
+in `applyFilters`.
+
+### M-7 — `_geocode_cache` grows without bound (`backend/main.py`, line 84)
+The geocoding cache is an unbounded in-memory dict. In a long-running multi-user deployment,
+many unique location strings accumulate indefinitely. Replace with an `functools.lru_cache`
+or a dict with a max-size eviction policy.
+
+---
+
+## LOW
+
+### L-1 — Session expiry missing from `sessions` table leaves no mechanism for pruning old tokens
+Even if tokens are not technically infinite (C-1), there is no `created_at`-based cleanup
+query. Old sessions from months ago sit in the table forever, growing it without bound.
+
+### L-2 — `setTimeout(emitBounds, 300)` is a magic number (`frontend/components/MapPanel.tsx`, line 70)
+The 300ms delay before the initial bounds emit is undocumented. Leaflet's `map.whenReady`
+callback or a `requestAnimationFrame` would be more semantically correct.
+
+### L-3 — Chat message list uses array index as React key (`frontend/components/ChatPanel.tsx`, line 105)
+`key={i}` causes key instability if messages are ever prepended or reordered. Use a stable
+monotonic id attached to each message object.
+
+### L-4 — `useOverpass` does not reset `cachedBoundsRef` on zoom-out (`frontend/hooks/useOverpass.ts`, lines 70–75)
+When the user zooms out below `MIN_ZOOM` and then back in without panning, `hasSignificantShift`
+compares against the pre-zoom-out bounds. If they match the new bounds closely, the re-fetch
+is skipped. Reset `cachedBoundsRef.current = null` on zoom-out to guarantee a fresh fetch.
+
+### L-5 — `capacityDataPct` reflects all campings, not the filtered subset (`frontend/app/page.tsx`, lines 110–114)
+The hint shown in `FilterPanel` ("X% campings heeft capaciteitsdata") is computed from
+`sortedCampings` (all campings in viewport) rather than the currently filtered set, so the
+percentage can be misleading when other filters are active.
+
+### L-6 — No logging configuration; messages may be silently dropped (`backend/main.py`, line 29)
+`logging.getLogger("kampeerhub")` creates a logger but no handler or level is set. Without
+explicit configuration, log output depends entirely on the deployment environment. Add a
+`logging.basicConfig(level=logging.INFO)` call in `lifespan` or pass `--log-level info` to
+uvicorn in the Dockerfile CMD.
+
+### L-7 — Admin page access link shown based on `localStorage.isAdmin`, not server state (`frontend/app/page.tsx`, line 126)
+Any user who sets `localStorage.isAdmin = "true"` will see the "beheer" link. The API correctly
+enforces server-side, but the misleading UI access is a poor experience. Verify admin status
+from the login response stored in state only, not from a persistent localStorage key.
+
+### L-8 — `ChatPanel` frontend timeout (25s) is close to backend worst-case (21s) (`frontend/components/ChatPanel.tsx`, line 55)
+The frontend aborts after 25s; the backend can take up to 3 × 7s = 21s. Network latency
+could cause the frontend to abort before the backend finishes its final attempt, producing a
+misleading "Verbindingsfout" error. Increase the gap — either lower the backend budget or
+raise the frontend timeout.
+
+### L-9 — `_normalize_camping_name` strips only the first matching prefix (`backend/main.py`, lines 176–179)
+The `break` after the first matching prefix means a doubly-prefixed name like
+`"Camping Camping Naturiste"` becomes `"camping naturiste"` instead of `"naturiste"`. This is
+an edge case but can cause a lookup miss in `_atout_france_lookup`.
+
+### L-10 — Dockerfile first `COPY backend/pyproject.toml` is silently overwritten by second `COPY backend/` (`Dockerfile`, lines 17–21)
+The layer-cache optimisation (copy lockfile first, run `uv sync`, then copy source) works
+correctly, but a comment explaining why the first `COPY` exists would prevent future confusion
+about the apparent redundancy.
+
+---
+
+## INFO
+
+- No tests exist. `test/` directory is absent. Backend unit tests and E2E tests are both listed
+  as "Not started" in `PLAN.md`.
+- The `Camping` TypeScript type uses optional (`?`) fields for tags, but the backend always
+  serialises all tag keys. Non-optional fields with `| null` union would be more accurate.
+- TILE_TTL_SECONDS is 7 days. If a tile is cached before Atout France data is imported (first
+  startup), it will not be enriched until TTL expires. This trade-off is not documented in
+  PLAN.md.
+- `math.floor` on negative coordinates in `tile_keys` works correctly (Python's `math.floor`
+  rounds toward negative infinity), but this behaviour is non-obvious to developers familiar
+  with C-style integer truncation. A comment would help.
 
 Severity levels: CRITICAL / HIGH / MEDIUM / LOW / INFO
 

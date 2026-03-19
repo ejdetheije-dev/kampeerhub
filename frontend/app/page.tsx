@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import MapPanel from "@/components/MapPanel";
 import CampingList from "@/components/CampingList";
 import ChatPanel from "@/components/ChatPanel";
@@ -54,7 +54,7 @@ function applyFilters(campings: Camping[], filters: Filters, waterPoints: WaterP
   });
 }
 
-function AppContent({ isAdmin, onLogout }: { isAdmin: boolean; onLogout: () => void }) {
+function AppContent({ isAdmin, onLogout, authToken }: { isAdmin: boolean; onLogout: () => void; authToken: string | null }) {
   const [bounds, setBounds] = useState<Bounds | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
@@ -188,6 +188,7 @@ function AppContent({ isAdmin, onLogout }: { isAdmin: boolean; onLogout: () => v
             }
             onNavigateMap={(lat, lon, zoom) => mapFlyToRef.current?.(lat, lon, zoom)}
             onSetTravelRange={setTravelHours}
+            authToken={authToken}
             onSelectCamping={(name) => {
               const found = campings.find((c) =>
                 c.name.toLowerCase().includes(name.toLowerCase())
@@ -208,14 +209,13 @@ function AppContent({ isAdmin, onLogout }: { isAdmin: boolean; onLogout: () => v
 }
 
 export default function Home() {
-  const [authToken, setAuthToken] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem("authToken");
-  });
-  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("isAdmin") === "true";
-  });
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+
+  useEffect(() => {
+    setAuthToken(localStorage.getItem("authToken"));
+    setIsAdmin(localStorage.getItem("isAdmin") === "true");
+  }, []);
 
   function handleEnter(token: string, admin: boolean, name: string) {
     localStorage.setItem("authToken", token);
@@ -229,7 +229,7 @@ export default function Home() {
     return <LandingPage onEnter={handleEnter} />;
   }
 
-  return <AppContent isAdmin={isAdmin} onLogout={() => {
+  return <AppContent isAdmin={isAdmin} authToken={authToken} onLogout={() => {
     localStorage.removeItem("authToken");
     localStorage.removeItem("isAdmin");
     localStorage.removeItem("userName");

@@ -20,9 +20,10 @@ interface ChatPanelProps {
   onNavigateMap?: (lat: number, lon: number, zoom: number) => void;
   onSetTravelRange?: (hours: number) => void;
   onSelectCamping?: (name: string) => void;
+  authToken?: string | null;
 }
 
-export default function ChatPanel({ onSetFilters, onNavigateMap, onSetTravelRange, onSelectCamping }: ChatPanelProps) {
+export default function ChatPanel({ onSetFilters, onNavigateMap, onSetTravelRange, onSelectCamping, authToken }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     { role: "assistant", content: "Hallo! Ik ben kampeerhub. Waar wil je naartoe kamperen?" },
   ]);
@@ -57,7 +58,10 @@ export default function ChatPanel({ onSetFilters, onNavigateMap, onSetTravelRang
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { "Authorization": `Bearer ${authToken}` } : {}),
+        },
         body: JSON.stringify({ messages: apiMessages }),
         signal: controller.signal,
       });

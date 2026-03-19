@@ -40,7 +40,8 @@ export default function DetailOverlay({ camping, isFavorite, onToggleFavorite, o
   const [weatherError, setWeatherError] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
     setForecast(null);
     setWeatherError(false);
     const url =
@@ -48,10 +49,10 @@ export default function DetailOverlay({ camping, isFavorite, onToggleFavorite, o
       `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode` +
       `&forecast_days=7&timezone=Europe%2FParis`;
 
-    fetch(url)
+    fetch(url, { signal: controller.signal })
       .then((r) => r.json())
       .then((data) => {
-        if (cancelled) return;
+        clearTimeout(timeoutId);
         const d = data.daily;
         const days: DayForecast[] = d.time.map((t: string, i: number) => ({
           date: t,
@@ -62,9 +63,9 @@ export default function DetailOverlay({ camping, isFavorite, onToggleFavorite, o
         }));
         setForecast(days);
       })
-      .catch(() => { if (!cancelled) setWeatherError(true); });
+      .catch((err) => { if (err.name !== "AbortError") setWeatherError(true); });
 
-    return () => { cancelled = true; };
+    return () => { clearTimeout(timeoutId); controller.abort(); };
   }, [camping.lat, camping.lon]);
 
   const activeTags = (Object.entries(tags) as [string, unknown][])
