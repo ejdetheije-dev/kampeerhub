@@ -63,6 +63,7 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 14. **AI chat integratie** — DONE (KAM-13): acties navigate_map/set_filters/set_travel_range/select_camping; Nominatim geocoding; acompletion async met 3x backend retry; inputfocus na antwoord
 15. **Code review fixes** — DONE: alle CRITICAL/HIGH/MEDIUM issues uit code review opgelost (zie planning/REVIEW.md)
 16. **Knusse campings** — DONE (KAM-14): Atout France CSV import bij startup; naam-matching met OSM; cozy flag + website fallback; groen diamant-icoon op kaart; badge in lijst; enrichment via asyncio.to_thread na Overpass lock
+17. **Landingspagina** — DONE (KAM-15): `LandingPage` component; login/aanmelden tabs (MVP zonder auth); `localStorage.loggedIn` flag; `AppContent` los van `Home` in page.tsx
 
 ---
 

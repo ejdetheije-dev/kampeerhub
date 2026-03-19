@@ -1,7 +1,7 @@
 # plan — kampeerhub
 
 ##  Huidige staat
-Laatste wijziging: KAM-14 knusse campings ✓ (2026-03-19)
+Laatste wijziging: KAM-15 landingspagina MVP ✓ (2026-03-19)
 Volgende: nieuwe Jira features
 Open: E2E tests (test/ directory bestaat nog niet), LOW/INFO issues uit code review
 Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatPanel retry/timeout logica
@@ -33,7 +33,7 @@ Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatP
 6. Na elke PR: update de "Huidige staat" sectie hierboven
 7. Bij twijfel over architectuurkeuze: vraag, niet gokken
 
-## Project Status (2026-03-19, updated after KAM-14)
+## Project Status (2026-03-19, updated after KAM-15)
 
 | Step | Status | Notes |
 |---|---|---|
@@ -56,6 +56,7 @@ Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatP
 | Code review — MEDIUM | Done | haversine sort; weather error state; TAG_LABELS/HeartIcon naar shared.tsx; capacity parser; dog=leashed; size_type validatie; location_name max_length; DATABASE_PATH gedocumenteerd |
 | Code review — LOW/INFO | Not started | Zie planning/REVIEW.md voor volledige lijst |
 | KAM-14 knusse campings | Done | Atout France CSV import; name-based matching; cozy flag; diamond icoon (groen) op kaart; badge in lijst; AF website fallback |
+| KAM-15 landingspagina | Done | LandingPage component; login/register tabs (MVP, geen auth); localStorage loggedIn flag; AppContent los van Home |
 | E2E tests | Not started | `test/` directory does not exist yet |
 | Backend unit tests | Not started | |
 

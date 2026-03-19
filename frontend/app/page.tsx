@@ -8,6 +8,7 @@ import { useOverpass } from "@/hooks/useOverpass";
 import { useWaterBodies } from "@/hooks/useWaterBodies";
 import { useFavorites } from "@/hooks/useFavorites";
 import DetailOverlay from "@/components/DetailOverlay";
+import LandingPage from "@/components/LandingPage";
 import type { Bounds, Camping, Filters, SizeType } from "@/types/camping";
 import { DEFAULT_FILTERS } from "@/types/camping";
 import type { WaterPoint } from "@/hooks/useWaterBodies";
@@ -53,7 +54,7 @@ function applyFilters(campings: Camping[], filters: Filters, waterPoints: WaterP
   });
 }
 
-export default function Home() {
+function AppContent() {
   const [bounds, setBounds] = useState<Bounds | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
@@ -200,4 +201,22 @@ export default function Home() {
       </div>
     </div>
   );
+}
+
+export default function Home() {
+  const [loggedIn, setLoggedIn] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("loggedIn") === "true";
+  });
+
+  function handleEnter() {
+    localStorage.setItem("loggedIn", "true");
+    setLoggedIn(true);
+  }
+
+  if (!loggedIn) {
+    return <LandingPage onEnter={handleEnter} />;
+  }
+
+  return <AppContent />;
 }
