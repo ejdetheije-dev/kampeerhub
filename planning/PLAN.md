@@ -1,8 +1,8 @@
 # plan — kampeerhub
 
 ##  Huidige staat
-Laatste PR: KAM-11 Deploy ✓
-Volgende: KAM-12 Reisbereik vanaf camping
+Laatste PR: KAM-12 Reisbereik ✓
+Volgende: E2E tests of nieuwe feature
 Open: E2E tests (test/ directory bestaat nog niet)
 Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8)
 
@@ -31,6 +31,7 @@ Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8)
 | KAM-9 Weather widget | Done | 7-daagse Open-Meteo voorspelling in DetailOverlay; max/min temp, neerslag, weerlabel per dag; timezone Europe/Paris; geen API key |
 | KAM-10 Favourites | Done | `useFavorites` hook met localStorage; hart-icoon op campingkaart en in DetailOverlay; favorieten-only filter in lijstheader |
 | KAM-11 Deploy | Done | Multi-stage Docker build; venv via .venv/bin/uvicorn (geen uv run overhead) |
+| KAM-12 Reisbereik vanaf camping | Done | Slider 0-8u in DetailOverlay; cirkel op kaart; vogelvlucht = reistijd*90/1.3; skipTrailingSlashRedirect fix voor dev proxy |
 | E2E tests | Not started | `test/` directory does not exist yet |
 | Backend unit tests | Not started | |
 
