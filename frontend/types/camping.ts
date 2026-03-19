@@ -21,6 +21,7 @@ export interface Camping {
     fee?: string;
     charge?: string;
     website?: string;
+    cozy?: boolean;
   };
 }
 

@@ -104,8 +104,13 @@ export default function CampingList({
                   <HeartIcon filled={isFav} />
                 </button>
               </div>
-              {activeTags.length > 0 && (
+              {(activeTags.length > 0 || c.tags.cozy) && (
                 <div className="flex flex-wrap gap-1 mb-2">
+                  {c.tags.cozy && (
+                    <span className="text-xs px-2 py-0.5 rounded bg-green-900/60 text-green-400 border border-green-700/40">
+                      knusse camping
+                    </span>
+                  )}
                   {activeTags.map((tag) => (
                     <span key={tag} className="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-300">
                       {tag}
