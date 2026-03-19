@@ -61,6 +61,7 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 12. **Deploy** — DONE (KAM-11): Docker multi-stage build; `.venv/bin/uvicorn` als CMD; `skipTrailingSlashRedirect: true` in next.config.ts
 13. **Reisbereik** — DONE (KAM-12): slider 0-8u in DetailOverlay; cirkel op kaart via Leaflet ref (synchroon); vogelvlucht = reistijd × 90 / 1.3
 14. **AI chat integratie** — DONE (KAM-13): acties navigate_map/set_filters/set_travel_range/select_camping; Nominatim geocoding; acompletion async met 3x backend retry; inputfocus na antwoord
+15. **Code review fixes** — DONE: alle CRITICAL/HIGH/MEDIUM issues uit code review opgelost (zie planning/REVIEW.md)
 
 ---
 
@@ -77,3 +78,10 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 - **Haversine wegfactor**: vogelvlucht_max = reistijd × snelheid / wegfactor (dus `/1.3`, niet `*1.3`).
 - **AI chat LLM**: gebruikt `acompletion` (litellm async) met `asyncio.wait_for(timeout=9s)` en 3x retry loop. `asyncio.to_thread` NIET gebruiken — kan niet geannuleerd worden waardoor threads accumuleren. Provider: OpenRouter `gpt-oss-120b` met `allow_fallbacks: True` (Cerebras → Fireworks → Together).
 - **ChatResponse schema**: acties zijn `none|set_filters|navigate_map|set_travel_range|select_camping`. Geen prijs-gerelateerde filters — die zijn uit het project verwijderd.
+- **asyncio.to_thread**: alleen gebruiken voor SQLite reads op de hot path (`get_campings_in_bbox`, `get_water_points_in_bbox`). Niet voor writes in background tasks — die zijn snel en geserialiseerd via Lock. Zie PLAN.md voor revert-instructies.
+- **Geocoding cache**: `_geocode_cache` dict in geheugen voorkomt herhaalde Nominatim calls. User-Agent bevat GitHub URL conform Nominatim beleid.
+- **Gedeelde frontend componenten**: `TAG_LABELS` en `HeartIcon` leven in `frontend/components/shared.tsx` — niet dupliceren.
+- **Water polling**: `useWaterBodies` stopt polling zodra `fetching: false`, ook als `points.length === 0` (inland areas zijn geldige lege staat).
+- **select_camping feedback**: toont timed banner in kaartgebied als camping niet in huidig viewport gevonden wordt.
+- **Capaciteit parsing**: `re.search(r"\d+", cap)` pakt eerste getal uit waardes als "150-200" of "~100".
+- **Dog filter**: `dog in ("yes", "leashed")` — leashed is ook toegestaan.
