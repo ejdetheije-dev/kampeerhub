@@ -14,8 +14,8 @@ import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from litellm import completion
-from litellm.exceptions import AuthenticationError, RateLimitError, ServiceUnavailableError
+from litellm import acompletion
+from litellm.exceptions import AuthenticationError, RateLimitError, ServiceUnavailableError, Timeout
 from pydantic import BaseModel, Field
 
 load_dotenv()
@@ -29,17 +29,38 @@ TILE_TTL_SECONDS = 7 * 24 * 3600  # 7 days
 MAX_TILES = 16
 
 MODEL = "openrouter/openai/gpt-oss-120b"
-EXTRA_BODY = {"provider": {"order": ["cerebras"]}}
+EXTRA_BODY = {"provider": {"order": ["cerebras", "fireworks", "together"], "allow_fallbacks": True}}
 
-SYSTEM_PROMPT = """Je bent kampeerhub, een AI assistent die helpt met het zoeken en boeken van campings in Europa.
-Je helpt gebruikers met:
-- Campings zoeken op basis van voorkeuren (locatie, faciliteiten, prijs, afstand tot zee)
-- Campings vergelijken
-- De beste camping aanbevelen op basis van behoeften
-- Reserveringen maken
+SYSTEM_PROMPT = """Je bent kampeerhub, een Nederlandse AI assistent voor het zoeken van campings in Europa.
 
-Wees beknopt en data-gedreven. Stel gerichte vragen om de perfecte camping te vinden.
-Antwoord altijd in het Nederlands."""
+BELANGRIJK:
+- Antwoord ALTIJD in het Nederlands, nooit in het Engels
+- Het veld "message" is wat de gebruiker ziet — schrijf daar een korte, vriendelijke Nederlandse zin
+- Nooit technische termen of actienamen in het "message" veld zetten
+
+Beschikbare acties (gebruik de juiste op basis van de vraag):
+
+1. set_filters — filters aanpassen:
+   - dog: true/false | wifi: true/false | pool: true/false
+   - size_type: "all" | "small" | "medium" | "large" | "naturist"
+   - water_max_km: getal 1-20 of null (uitschakelen)
+
+2. navigate_map — kaart naar locatie bewegen:
+   - location_name: plaatsnaam (bijv. "Bordeaux", "Bretagne")
+
+3. set_travel_range — reisbereik instellen vanuit geselecteerde camping:
+   - travel_hours: 0-8 (uren), 0 = uitschakelen
+
+4. select_camping — camping selecteren op naam:
+   - camping_name: naam van de camping
+
+5. none — alleen een antwoord, geen actie
+
+Voorbeeldresponse voor "ga naar bordeaux":
+{"message": "Ik navigeer naar Bordeaux.", "action": "navigate_map", "navigate": {"location_name": "Bordeaux"}}
+
+Voorbeeldresponse voor "filter op honden":
+{"message": "Filter ingesteld: alleen campings waar honden welkom zijn.", "action": "set_filters", "filters": {"dog": true}}"""
 
 MOCK_RESPONSE = '{"message": "Dit is een testantwoord. LLM_MOCK is ingeschakeld.", "action": "none"}'
 
@@ -359,9 +380,45 @@ class ChatRequest(BaseModel):
     messages: list[ChatMessage] = Field(max_length=50)
 
 
+class FiltersPayload(BaseModel):
+    dog: bool | None = None
+    wifi: bool | None = None
+    pool: bool | None = None
+    size_type: str | None = None       # "all"|"small"|"medium"|"large"|"naturist"
+    water_max_km: int | None = None    # null = disable filter
+
+
+class NavigatePayload(BaseModel):
+    location_name: str
+    lat: float | None = None           # filled by backend after geocoding
+    lon: float | None = None
+    zoom: int = 10
+
+
 class ChatResponse(BaseModel):
     message: str
-    action: Literal["none", "search", "set_preference"] = "none"
+    action: Literal["none", "set_filters", "navigate_map", "set_travel_range", "select_camping"] = "none"
+    filters: FiltersPayload | None = None
+    navigate: NavigatePayload | None = None
+    travel_hours: float | None = None
+    camping_name: str | None = None   # for select_camping
+
+
+async def geocode(location_name: str) -> tuple[float, float] | None:
+    """Resolve a place name to (lat, lon) via Nominatim."""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={"q": location_name, "format": "json", "limit": 1},
+                headers={"User-Agent": "kampeerhub/1.0"},
+            )
+        results = res.json()
+        if results:
+            return float(results[0]["lat"]), float(results[0]["lon"])
+    except Exception:
+        logger.warning("Geocoding failed for %r", location_name)
+    return None
 
 
 @app.post("/api/chat")
@@ -373,26 +430,44 @@ async def chat(req: ChatRequest) -> ChatResponse:
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     messages += [{"role": m.role, "content": m.content} for m in req.messages]
 
+    response = None
+    for attempt in range(3):
+        try:
+            response = await asyncio.wait_for(
+                acompletion(
+                    model=MODEL,
+                    messages=messages,
+                    response_format=ChatResponse,
+                    extra_body=EXTRA_BODY,
+                    api_key=_openrouter_api_key,
+                    timeout=6,
+                ),
+                timeout=7.0,
+            )
+            break
+        except AuthenticationError:
+            raise HTTPException(status_code=401, detail="LLM authenticatie mislukt. Controleer de API sleutel.")
+        except RateLimitError:
+            raise HTTPException(status_code=429, detail="Te veel verzoeken. Probeer later opnieuw.")
+        except Exception as e:
+            logger.warning("LLM poging %d/3 mislukt: %s", attempt + 1, type(e).__name__)
+
+    if response is None:
+        raise HTTPException(status_code=503, detail="LLM tijdelijk niet beschikbaar.")
+
+    raw = response.choices[0].message.content
     try:
-        response = await asyncio.to_thread(
-            completion,
-            model=MODEL,
-            messages=messages,
-            response_format=ChatResponse,
-            reasoning_effort="low",
-            extra_body=EXTRA_BODY,
-            api_key=_openrouter_api_key,
-        )
-        return ChatResponse.model_validate_json(response.choices[0].message.content)
-    except AuthenticationError:
-        raise HTTPException(status_code=401, detail="LLM authenticatie mislukt. Controleer de API sleutel.")
-    except RateLimitError:
-        raise HTTPException(status_code=429, detail="Te veel verzoeken. Probeer later opnieuw.")
-    except ServiceUnavailableError:
-        raise HTTPException(status_code=503, detail="LLM service tijdelijk niet beschikbaar.")
+        data = ChatResponse.model_validate_json(raw)
     except Exception:
-        logger.exception("LLM request failed")
-        raise HTTPException(status_code=500, detail="LLM fout. Probeer opnieuw.")
+        logger.warning("ChatResponse validation failed for response: %.200s", raw)
+        return ChatResponse(message="Sorry, probeer je vraag anders te formuleren.")
+
+    if data.action == "navigate_map" and data.navigate:
+        coords = await geocode(data.navigate.location_name)
+        if coords:
+            data.navigate.lat, data.navigate.lon = coords
+
+    return data
 
 
 @app.get("/api/health")

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import MapPanel from "@/components/MapPanel";
 import CampingList from "@/components/CampingList";
 import ChatPanel from "@/components/ChatPanel";
@@ -8,7 +8,7 @@ import { useOverpass } from "@/hooks/useOverpass";
 import { useWaterBodies } from "@/hooks/useWaterBodies";
 import { useFavorites } from "@/hooks/useFavorites";
 import DetailOverlay from "@/components/DetailOverlay";
-import type { Bounds, Camping, Filters } from "@/types/camping";
+import type { Bounds, Camping, Filters, SizeType } from "@/types/camping";
 import { DEFAULT_FILTERS } from "@/types/camping";
 import type { WaterPoint } from "@/hooks/useWaterBodies";
 
@@ -58,6 +58,7 @@ export default function Home() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [travelHours, setTravelHours] = useState<number>(0);
+  const mapFlyToRef = useRef<((lat: number, lon: number, zoom: number) => void) | null>(null);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const { campings, loading, error, tooFarOut } = useOverpass(bounds);
   const waterPoints = useWaterBodies(bounds, filters.waterMaxKm !== null);
@@ -131,6 +132,7 @@ export default function Home() {
             onSelectCamping={handleSelectCamping}
             reachableIds={reachableIds}
             travelRadiusKm={travelHours > 0 ? travelHours * 90 / 1.3 : null}
+            onMapReady={(fn) => { mapFlyToRef.current = fn; }}
           />
           {selectedCamping && (
             <DetailOverlay
@@ -162,7 +164,26 @@ export default function Home() {
             showFavoritesOnly={showFavoritesOnly}
             onToggleFavoritesOnly={() => setShowFavoritesOnly((v) => !v)}
           />
-          <ChatPanel />
+          <ChatPanel
+            onSetFilters={(patch) =>
+              setFilters((f) => ({
+                ...f,
+                ...(patch.dog !== undefined ? { dog: patch.dog! } : {}),
+                ...(patch.wifi !== undefined ? { wifi: patch.wifi! } : {}),
+                ...(patch.pool !== undefined ? { pool: patch.pool! } : {}),
+                ...(patch.size_type !== undefined ? { sizeType: patch.size_type as SizeType } : {}),
+                ...(patch.water_max_km !== undefined ? { waterMaxKm: patch.water_max_km } : {}),
+              }))
+            }
+            onNavigateMap={(lat, lon, zoom) => mapFlyToRef.current?.(lat, lon, zoom)}
+            onSetTravelRange={setTravelHours}
+            onSelectCamping={(name) => {
+              const found = campings.find((c) =>
+                c.name.toLowerCase().includes(name.toLowerCase())
+              );
+              if (found) handleSelectCamping(found);
+            }}
+          />
         </div>
       </div>
     </div>
