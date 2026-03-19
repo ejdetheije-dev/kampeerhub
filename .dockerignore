@@ -1,0 +1,35 @@
+# Development artifacts
+**/__pycache__/
+**/*.py[cod]
+**/.venv/
+**/*.egg-info/
+
+# Databases (runtime only — mounted as Docker volume)
+backend/*.db
+backend/*.db-shm
+backend/*.db-wal
+database/*.db
+
+# Frontend build artifacts (rebuilt in Docker)
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Test artifacts
+.playwright-mcp/
+test/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Environment
+.env
+.env.local
+
+# Git
+.git/
+.gitignore
