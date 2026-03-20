@@ -2,8 +2,6 @@ services:
   - type: web
     name: kampeerhub
     runtime: docker
-    dockerBuildArgs:
-      - NEXT_PUBLIC_MAPBOX_TOKEN=$NEXT_PUBLIC_MAPBOX_TOKEN
     envVars:
       - key: OPENROUTER_API_KEY
         sync: false

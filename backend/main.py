@@ -649,6 +649,11 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/api/config")
+def config():
+    return {"mapbox_token": os.getenv("NEXT_PUBLIC_MAPBOX_TOKEN", "")}
+
+
 # --- Auth helpers ---
 
 def _get_user_by_token(token: str) -> dict | None:
