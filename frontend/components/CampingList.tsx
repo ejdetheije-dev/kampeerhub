@@ -19,6 +19,8 @@ interface CampingListProps {
   onToggleFavorite: (id: string) => void;
   showFavoritesOnly: boolean;
   onToggleFavoritesOnly: () => void;
+  tilesTotal?: number;
+  tilesCached?: number;
 }
 
 export default function CampingList({
@@ -36,6 +38,8 @@ export default function CampingList({
   onToggleFavorite,
   showFavoritesOnly,
   onToggleFavoritesOnly,
+  tilesTotal,
+  tilesCached,
 }: CampingListProps) {
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -44,7 +48,11 @@ export default function CampingList({
           {tooFarOut ? (
             <span className="text-gray-500">zoom in om campings te laden</span>
           ) : loading ? (
-            <span className="text-gray-500">laden...</span>
+            <span className="text-gray-500">
+              {tilesTotal && tilesTotal > 0 && tilesCached !== undefined && tilesCached < tilesTotal
+                ? `laden... (${tilesCached}/${tilesTotal})`
+                : "laden..."}
+            </span>
           ) : error ? (
             <span className="text-red-400">{error}</span>
           ) : (

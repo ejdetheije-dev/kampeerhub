@@ -62,7 +62,7 @@ function AppContent({ isAdmin, onLogout, authToken }: { isAdmin: boolean; onLogo
   const mapFlyToRef = useRef<((lat: number, lon: number, zoom: number) => void) | null>(null);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [campingNotFound, setCampingNotFound] = useState<string | null>(null);
-  const { campings, loading, error, tooFarOut } = useOverpass(bounds);
+  const { campings, loading, error, tooFarOut, tilesTotal, tilesCached } = useOverpass(bounds);
   const waterPoints = useWaterBodies(bounds, filters.waterMaxKm !== null);
   const { favorites, toggleFavorite } = useFavorites();
 
@@ -174,6 +174,8 @@ function AppContent({ isAdmin, onLogout, authToken }: { isAdmin: boolean; onLogo
             onToggleFavorite={toggleFavorite}
             showFavoritesOnly={showFavoritesOnly}
             onToggleFavoritesOnly={() => setShowFavoritesOnly((v) => !v)}
+            tilesTotal={tilesTotal}
+            tilesCached={tilesCached}
           />
           <ChatPanel
             onSetFilters={(patch) =>
