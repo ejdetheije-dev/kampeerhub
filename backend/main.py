@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 
 load_dotenv()
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("kampeerhub")
 
 DB_PATH = Path(os.getenv("DATABASE_PATH", "/app/database/kampeerhub.db"))
