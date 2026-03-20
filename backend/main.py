@@ -504,13 +504,21 @@ async def warmup_france_tiles() -> None:
     fetched = 0
     for tile in missing:
         await asyncio.sleep(0)  # yield — user requests can acquire the lock before next warmup tile
+        if is_tile_cached(tile):
+            continue
+        # Wait out any active Overpass cooldown before trying to acquire the lock
+        wait_time = _overpass_cooldown_until - time.time()
+        if wait_time > 0:
+            logger.info("France warmup: rate limited, pausing %.0fs before next tile", wait_time)
+            await asyncio.sleep(wait_time + 1)
         if is_tile_cached(tile) or tile in _fetching_tiles:
             continue
         _fetching_tiles.add(tile)
         await fetch_tile(tile)
-        fetched += 1
-        if fetched % 10 == 0:
-            logger.info("France warmup: %d/%d tiles done", fetched, len(missing))
+        if is_tile_cached(tile):
+            fetched += 1
+            if fetched % 10 == 0:
+                logger.info("France warmup: %d/%d tiles done", fetched, len(missing))
     logger.info("France warmup: complete (%d tiles fetched)", fetched)
 
 
