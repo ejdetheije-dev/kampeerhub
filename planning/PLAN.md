@@ -33,7 +33,7 @@ Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatP
 6. Na elke PR: update de "Huidige staat" sectie hierboven
 7. Bij twijfel over architectuurkeuze: vraag, niet gokken
 
-## Project Status (2026-03-19, updated after KAM-16)
+## Project Status (2026-03-20, updated after KAM-19)
 
 | Step | Status | Notes |
 |---|---|---|
@@ -41,7 +41,7 @@ Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatP
 | KAM-2 AI chat | Done | `/api/chat`, ChatPanel, LiteLLM/Cerebras |
 | Bug fixes & cleanup | Done | LLM_MOCK, error handling, MapPanel StrictMode, local Leaflet icons, input limits |
 | KAM-3 Leaflet map | Done | Map renders with OSM tiles, centered on France (46.5, 2.5) zoom 6 |
-| KAM-4 Overpass hook | Done | Backend SQLite tile cache; frontend polls `/api/campings`; debounce 800ms, 30% shift threshold, 3s poll interval |
+| KAM-4 Overpass hook | Done | Backend SQLite tile cache; frontend polls `/api/campings`; debounce 800ms, 30% shift threshold, adaptive poll 1s→3s |
 | KAM-5 Pins on map | Done | divIcon circle markers; click pin or list item to select; yellow highlight for selected |
 | KAM-6 CampingList (real data) | Done | Live OSM data, tag badges, sorted by distance to map center; website tag as primary deeplink, Eurocampings search as fallback |
 | KAM-7 Filters | Done | Uitklapbaar filterpanel: faciliteiten (honden/wifi/zwembad), type/grootte, afstand tot water slider; `/api/water-bodies` endpoint met SQLite tile cache; beaches+grote meren+grote rivieren als waterdefinitie |
