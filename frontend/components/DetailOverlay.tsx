@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import type { Camping } from "@/types/camping";
 import { TAG_LABELS, HeartIcon } from "@/components/shared";
+
+const MapboxFlyover = lazy(() => import("@/components/MapboxFlyover"));
 
 function weatherLabel(code: number): string {
   if (code === 0) return "zon";
@@ -38,6 +40,7 @@ export default function DetailOverlay({ camping, isFavorite, onToggleFavorite, o
   const { tags } = camping;
   const [forecast, setForecast] = useState<DayForecast[] | null>(null);
   const [weatherError, setWeatherError] = useState(false);
+  const [showFlyover, setShowFlyover] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -83,8 +86,8 @@ export default function DetailOverlay({ camping, isFavorite, onToggleFavorite, o
   const dayNames = ["zo", "ma", "di", "wo", "do", "vr", "za"];
 
   return (
-    <div className="absolute bottom-4 left-4 z-[1000] w-80 bg-[#0d1117] border border-gray-700 rounded shadow-xl text-gray-100">
-      <div className="flex items-start justify-between px-4 pt-4 pb-2 border-b border-gray-800">
+    <div className="absolute bottom-4 left-4 z-[1000] w-80 bg-[#0d1117] border border-gray-700 rounded shadow-xl text-gray-100 flex flex-col max-h-[calc(100vh-2rem)]">
+      <div className="flex items-start justify-between px-4 pt-4 pb-2 border-b border-gray-800 shrink-0">
         <span className="font-semibold text-sm leading-snug pr-2">{camping.name}</span>
         <div className="flex items-center gap-2 shrink-0">
           <button
@@ -103,7 +106,7 @@ export default function DetailOverlay({ camping, isFavorite, onToggleFavorite, o
         </div>
       </div>
 
-      <div className="px-4 py-3 space-y-3 text-xs">
+      <div className="px-4 py-3 space-y-3 text-xs overflow-y-auto">
         {activeTags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {activeTags.map((tag) => (
@@ -197,6 +200,22 @@ export default function DetailOverlay({ camping, isFavorite, onToggleFavorite, o
           >
             OSM
           </a>
+        </div>
+
+        <div className="border-t border-gray-800 pt-3">
+          <button
+            onClick={() => setShowFlyover((v) => !v)}
+            className="text-xs text-[#209dd7] hover:underline"
+          >
+            {showFlyover ? "Verberg 3D satellietbeeld" : "3D Satellietbeeld"}
+          </button>
+          {showFlyover && (
+            <div className="mt-2">
+              <Suspense fallback={<div className="text-gray-600 text-xs">laden...</div>}>
+                <MapboxFlyover lat={camping.lat} lon={camping.lon} />
+              </Suspense>
+            </div>
+          )}
         </div>
       </div>
     </div>

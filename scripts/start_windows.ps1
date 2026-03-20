@@ -4,7 +4,11 @@ $CONTAINER = "kampeerhub"
 
 if ($args -contains "--build" -or !(docker image inspect $IMAGE 2>$null)) {
     Write-Host "Building Docker image..."
-    docker build -t $IMAGE .
+    $mapboxToken = ""
+    if (Test-Path ".env") {
+        $mapboxToken = (Get-Content ".env" | Where-Object { $_ -match "^NEXT_PUBLIC_MAPBOX_TOKEN=" }) -replace "^NEXT_PUBLIC_MAPBOX_TOKEN=", ""
+    }
+    docker build -t $IMAGE --build-arg NEXT_PUBLIC_MAPBOX_TOKEN=$mapboxToken .
 }
 
 $running = docker ps -q -f "name=$CONTAINER"
