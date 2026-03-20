@@ -36,6 +36,7 @@ TILE_TTL_SECONDS = 7 * 24 * 3600  # 7 days
 MAX_TILES = 16
 
 MAX_BACKGROUND_PREFETCH = 6  # Soft cap on concurrent background prefetch tasks (adjacent only)
+WARMUP_TILE_DELAY_S = 30    # Polite delay between warmup tiles (Overpass guideline: max 2 req/min)
 
 
 def _france_tile_keys() -> list[str]:
@@ -519,6 +520,8 @@ async def warmup_france_tiles() -> None:
             fetched += 1
             if fetched % 10 == 0:
                 logger.info("France warmup: %d/%d tiles done", fetched, len(missing))
+        # Polite delay so warmup never triggers sustained Overpass rate limiting
+        await asyncio.sleep(WARMUP_TILE_DELAY_S)
     logger.info("France warmup: complete (%d tiles fetched)", fetched)
 
 
