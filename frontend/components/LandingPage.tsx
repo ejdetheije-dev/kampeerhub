@@ -28,7 +28,7 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
         });
         const data = await res.json();
         if (!res.ok) {
-          setError(data.detail ?? "Registratie mislukt");
+          setError(Array.isArray(data.detail) ? data.detail[0]?.msg ?? "Registratie mislukt" : data.detail ?? "Registratie mislukt");
           return;
         }
         if (data.status === "approved") {
@@ -54,7 +54,7 @@ export default function LandingPage({ onEnter }: LandingPageProps) {
     });
     const data = await res.json();
     if (!res.ok) {
-      setError(data.detail ?? "Inloggen mislukt");
+      setError(Array.isArray(data.detail) ? data.detail[0]?.msg ?? "Inloggen mislukt" : data.detail ?? "Inloggen mislukt");
       return;
     }
     onEnter(data.token, data.is_admin, data.name);
