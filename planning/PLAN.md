@@ -1,7 +1,7 @@
 # plan — kampeerhub
 
 ##  Huidige staat
-Laatste wijziging: Secret scanning fix — .playwright-mcp/ uit git history verwijderd (2026-03-20)
+Laatste wijziging: KAM-18 3D satellietflyover — Mapbox GL JS in DetailOverlay, Render deploy werkend (2026-03-20)
 Volgende: nieuwe Jira features of resterende LOW/INFO review issues
 Open: LOW/INFO issues uit code review, backend unit tests
 Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatPanel retry/timeout logica
@@ -62,6 +62,7 @@ Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatP
 | Security fixes (review CRITICAL+HIGH) | Done | Sessie expiry 30d; RegisterRequest validatie; AdminUpdateRequest model + 404 + admin-guard; /api/chat auth; hydration fix; water filter tooFarOut; AbortController water+weather; handleSubmit catch |
 | E2E tests | Done | Playwright; `test/` met globalSetup, 14 tests (auth/admin/api/app), LLM_MOCK=true, tmpfs DB |
 | Secret scanning fix | Done | `.playwright-mcp/` uit git history verwijderd via `git filter-repo`; Google API key was per ongeluk in consolelog beland; force-push naar main |
+| KAM-18 3D satellietflyover | Done | Mapbox GL JS in DetailOverlay; token runtime via `/api/config`; satelliet+terrain stijl; rAF rotatieanimatie; lazy-loaded; Render deploy werkend |
 | Backend unit tests | Not started | |
 
 ---
