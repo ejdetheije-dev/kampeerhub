@@ -6,8 +6,6 @@ import type { Bounds, Camping } from "@/types/camping";
 const MIN_ZOOM = 9;
 const DEBOUNCE_MS = 800;
 const POLL_MS = 3000;
-const POLL_MS_FAST = 1000;
-const FAST_POLL_COUNT = 3;
 const SHIFT_THRESHOLD = 0.3;
 
 function hasSignificantShift(prev: Bounds, next: Bounds): boolean {
@@ -24,12 +22,9 @@ export function useOverpass(bounds: Bounds | null) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tooFarOut, setTooFarOut] = useState(false);
-  const [tilesTotal, setTilesTotal] = useState(0);
-  const [tilesCached, setTilesCached] = useState(0);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pollCountRef = useRef(0);
   const cachedBoundsRef = useRef<Bounds | null>(null);
   const mountedRef = useRef(true);
   const abortRef = useRef<AbortController | null>(null);
@@ -49,20 +44,17 @@ export function useOverpass(bounds: Bounds | null) {
         { signal: controller.signal },
       );
       if (!res.ok) throw new Error(`${res.status}`);
-      const data: { campings: Camping[]; fetching: boolean; tiles_total?: number; tiles_cached?: number } = await res.json();
+      const data: { campings: Camping[]; fetching: boolean } = await res.json();
 
       if (controller.signal.aborted || !mountedRef.current) return;
 
       setCampings(data.campings);
-      if (data.tiles_total !== undefined) setTilesTotal(data.tiles_total);
-      if (data.tiles_cached !== undefined) setTilesCached(data.tiles_cached);
 
       if (data.fetching) {
-        const interval = pollCountRef.current < FAST_POLL_COUNT ? POLL_MS_FAST : POLL_MS;
-        pollCountRef.current++;
         pollRef.current = setTimeout(() => {
           if (mountedRef.current) load(b);
-        }, interval);
+          // else: component unmounted — do nothing
+        }, POLL_MS);
       }
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
@@ -90,10 +82,7 @@ export function useOverpass(bounds: Bounds | null) {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (pollRef.current) clearTimeout(pollRef.current);
 
-    debounceRef.current = setTimeout(() => {
-      pollCountRef.current = 0;
-      load(bounds);
-    }, DEBOUNCE_MS);
+    debounceRef.current = setTimeout(() => load(bounds), DEBOUNCE_MS);
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -112,5 +101,5 @@ export function useOverpass(bounds: Bounds | null) {
     };
   }, []);
 
-  return { campings, loading, error, tooFarOut, tilesTotal, tilesCached };
+  return { campings, loading, error, tooFarOut };
 }

@@ -29,12 +29,9 @@ Gebruik altijd [timeout:30][maxsize:1048576] en bounding box queries
 Alleen fetchen bij zoom >= 9 (anders te grote bbox → 500 error)
 **Architectuur**: backend haalt Overpass op en slaat op in SQLite per 1°×1° tile (permanent gecached)
 Frontend roept `/api/campings` aan; backend geeft direct gecachede campings terug + start background tile fetch
-Frontend pollt zolang `fetching: true`; eerste 3 polls op 1s interval, daarna 3s; stopt als alle tiles gecached zijn
+Frontend pollt elke 3s zolang `fetching: true`; stopt als alle tiles gecached zijn
 asyncio.Lock zorgt voor max 1 gelijktijdig Overpass verzoek (geen 429)
 Shift threshold: frontend refetcht alleen als kaartview >30% verschuift (debounce 800ms)
-Startup warmup: alle 135 metropolitane France tiles (42-51°N, -5 tot 9°E) worden sequentieel gevuld via `await fetch_tile()` (niet create_task); `asyncio.sleep(0)` tussen elke tile geeft gebruikersverzoeken voorrang op de lock (commit 6f0ccc0)
-Adjacent prefetch: na elke succesvolle tile fetch worden buren gekweued (Europa bbox, max 6 gelijktijdig)
-Voortgangsindicator: `/api/campings` retourneert `tiles_total` + `tiles_cached`; CampingList toont "laden... (X/Y)"
 
 ## Leaflet setup
 Importeer CSS in main.tsx: import 'leaflet/dist/leaflet.css'
@@ -71,7 +68,6 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 19. **Landingspagina redesign** — DONE (KAM-17): Unsplash campingfoto als achtergrond, donkere overlay, glazen kaart effect; alles in Nederlands
 20. **Security fixes** — DONE: sessie tokens verlopen na 30 dagen; RegisterRequest validatie (min/max fields); AdminUpdateRequest Pydantic model + 404 guard + admin-lockout guard; `/api/chat` vereist Bearer token; hydration fix via useEffect; water slider disabled bij tooFarOut; AbortController in useWaterBodies + DetailOverlay weather; catch in handleSubmit
 21. **E2E tests** — DONE: Playwright in `test/`; `docker-compose.test.yml` (LLM_MOCK=true, tmpfs DB, poort 8001); `globalSetup.ts` maakt admin aan vóór tests; 14 tests in 4 bestanden (auth/admin/api/app); alle 14 geslaagd in ~22s
-22. **Laadoptimalisatie** — DONE (KAM-19): startup warmup alle 135 France tiles sequentieel (commit 6f0ccc0); adjacent prefetch (Europa bbox, max 6 achtergrondtasks); adaptive polling 1s→3s; voortgangsindicator "laden... (X/Y)"; INFO logging voor kampeerhub logger
 
 ---
 

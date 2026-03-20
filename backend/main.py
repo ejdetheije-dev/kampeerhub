@@ -26,7 +26,6 @@ from pydantic import BaseModel, Field
 
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("kampeerhub")
 
 DB_PATH = Path(os.getenv("DATABASE_PATH", "/app/database/kampeerhub.db"))
@@ -34,14 +33,6 @@ STATIC_DIR = Path(__file__).parent / "static"
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 TILE_TTL_SECONDS = 7 * 24 * 3600  # 7 days
 MAX_TILES = 16
-
-MAX_BACKGROUND_PREFETCH = 6  # Soft cap on concurrent background prefetch tasks (adjacent only)
-WARMUP_TILE_DELAY_S = 30    # Polite delay between warmup tiles (Overpass guideline: max 2 req/min)
-
-
-def _france_tile_keys() -> list[str]:
-    """All 1°×1° tile keys covering metropolitan France (42-51°N, -5 to 9°E)."""
-    return [f"{lat}_{lon}" for lat in range(42, 51) for lon in range(-5, 10)]
 
 MODEL = "openrouter/openai/gpt-oss-120b"
 EXTRA_BODY = {"provider": {"order": ["cerebras", "fireworks", "together"], "allow_fallbacks": True}}
@@ -424,7 +415,6 @@ async def fetch_tile(tile_key: str) -> None:
             elements = res.json().get("elements", [])
             store_tile(elements, tile_key)
         await asyncio.to_thread(enrich_tile_cozy, tile_key)
-        prefetch_adjacent(tile_key)
     except Exception:
         logger.exception("Failed to fetch tile %s", tile_key)
     finally:
@@ -470,61 +460,6 @@ async def fetch_water_tile(tile_key: str) -> None:
         _fetching_water_tiles.discard(tile_key)
 
 
-def prefetch_adjacent(tile_key: str) -> None:
-    """Queue uncached neighbour tiles as low-priority background tasks.
-
-    Stays within camping-relevant Europe and respects MAX_BACKGROUND_PREFETCH
-    to prevent runaway expansion.
-    """
-    lat, lon = map(int, tile_key.split("_"))
-    neighbours = [f"{lat+1}_{lon}", f"{lat-1}_{lon}", f"{lat}_{lon+1}", f"{lat}_{lon-1}"]
-    for neighbour in neighbours:
-        if len(_fetching_tiles) >= MAX_BACKGROUND_PREFETCH:
-            break
-        n_lat, n_lon = map(int, neighbour.split("_"))
-        if not (35 <= n_lat <= 60 and -10 <= n_lon <= 30):
-            continue
-        if not is_tile_cached(neighbour) and neighbour not in _fetching_tiles:
-            _fetching_tiles.add(neighbour)
-            asyncio.create_task(fetch_tile(neighbour))
-
-
-async def warmup_france_tiles() -> None:
-    """Sequentially pre-fetch all metropolitan France tiles in the background.
-
-    Fetches one tile at a time and yields between tiles so user-triggered requests
-    can acquire the Overpass lock first — users never wait behind the warmup queue.
-    """
-    await asyncio.sleep(5)  # Let the server fully initialise before hitting Overpass
-    all_tiles = _france_tile_keys()
-    missing = [t for t in all_tiles if not is_tile_cached(t)]
-    if not missing:
-        logger.info("France warmup: all %d tiles already cached", len(all_tiles))
-        return
-    logger.info("France warmup: starting sequential fetch of %d/%d tiles", len(missing), len(all_tiles))
-    fetched = 0
-    for tile in missing:
-        await asyncio.sleep(0)  # yield — user requests can acquire the lock before next warmup tile
-        if is_tile_cached(tile):
-            continue
-        # Wait out any active Overpass cooldown before trying to acquire the lock
-        wait_time = _overpass_cooldown_until - time.time()
-        if wait_time > 0:
-            logger.info("France warmup: rate limited, pausing %.0fs before next tile", wait_time)
-            await asyncio.sleep(wait_time + 1)
-        if is_tile_cached(tile) or tile in _fetching_tiles:
-            continue
-        _fetching_tiles.add(tile)
-        await fetch_tile(tile)
-        if is_tile_cached(tile):
-            fetched += 1
-            if fetched % 10 == 0:
-                logger.info("France warmup: %d/%d tiles done", fetched, len(missing))
-        # Polite delay so warmup never triggers sustained Overpass rate limiting
-        await asyncio.sleep(WARMUP_TILE_DELAY_S)
-    logger.info("France warmup: complete (%d tiles fetched)", fetched)
-
-
 # --- App ---
 
 @asynccontextmanager
@@ -535,7 +470,6 @@ async def lifespan(app: FastAPI):
     if not _openrouter_api_key and os.getenv("LLM_MOCK", "").lower() != "true":
         logger.warning("OPENROUTER_API_KEY is not set and LLM_MOCK is not enabled")
     await import_atout_france_csv()
-    asyncio.create_task(warmup_france_tiles())
     yield
 
 
@@ -570,8 +504,7 @@ async def campings_endpoint(south: float, west: float, north: float, east: float
         t in _fetching_tiles or (not is_tile_cached(t) and now < _tile_retry_after.get(t, 0))
         for t in tiles
     )
-    tiles_cached = sum(1 for t in tiles if is_tile_cached(t))
-    return {"campings": result, "fetching": fetching, "tiles_total": len(tiles), "tiles_cached": tiles_cached}
+    return {"campings": result, "fetching": fetching}
 
 
 @app.get("/api/water-bodies")
