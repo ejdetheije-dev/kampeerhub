@@ -35,17 +35,12 @@ OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 TILE_TTL_SECONDS = 7 * 24 * 3600  # 7 days
 MAX_TILES = 16
 
-# Popular France camping tiles pre-fetched at startup to minimize cold-start latency
-FRANCE_WARMUP_TILES = [
-    "47_-5", "47_-4", "47_-3", "47_-2", "47_-1",  # Bretagne + Loire
-    "48_-4", "48_-3", "48_-2", "48_-1", "48_0",   # Bretagne coast + Normandie
-    "49_0",  "49_-1",                               # Normandie east
-    "44_-2", "45_-1", "43_-2",                     # Atlantic south
-    "43_2",  "43_3",  "43_4",  "43_5",  "43_6",   # Mediterranean
-    "44_0",  "44_1",                                # Dordogne / Périgord
-    "45_6",  "44_6",  "46_2",                      # Alps + Loire Valley center
-]
-MAX_BACKGROUND_PREFETCH = 6  # Soft cap on concurrent background prefetch tasks
+MAX_BACKGROUND_PREFETCH = 6  # Soft cap on concurrent background prefetch tasks (adjacent only)
+
+
+def _france_tile_keys() -> list[str]:
+    """All 1°×1° tile keys covering metropolitan France (42-51°N, -5 to 9°E)."""
+    return [f"{lat}_{lon}" for lat in range(42, 51) for lon in range(-5, 10)]
 
 MODEL = "openrouter/openai/gpt-oss-120b"
 EXTRA_BODY = {"provider": {"order": ["cerebras", "fireworks", "together"], "allow_fallbacks": True}}
@@ -494,17 +489,29 @@ def prefetch_adjacent(tile_key: str) -> None:
 
 
 async def warmup_france_tiles() -> None:
-    """Pre-fetch popular France camping tiles in the background at startup."""
+    """Sequentially pre-fetch all metropolitan France tiles in the background.
+
+    Fetches one tile at a time and yields between tiles so user-triggered requests
+    can acquire the Overpass lock first — users never wait behind the warmup queue.
+    """
     await asyncio.sleep(5)  # Let the server fully initialise before hitting Overpass
-    missing = [t for t in FRANCE_WARMUP_TILES if not is_tile_cached(t) and t not in _fetching_tiles]
+    all_tiles = _france_tile_keys()
+    missing = [t for t in all_tiles if not is_tile_cached(t)]
     if not missing:
-        logger.info("France warmup: all %d tiles already cached", len(FRANCE_WARMUP_TILES))
+        logger.info("France warmup: all %d tiles already cached", len(all_tiles))
         return
-    logger.info("France warmup: queuing %d tiles", len(missing))
+    logger.info("France warmup: starting sequential fetch of %d/%d tiles", len(missing), len(all_tiles))
+    fetched = 0
     for tile in missing:
-        if tile not in _fetching_tiles:
-            _fetching_tiles.add(tile)
-            asyncio.create_task(fetch_tile(tile))
+        await asyncio.sleep(0)  # yield — user requests can acquire the lock before next warmup tile
+        if is_tile_cached(tile) or tile in _fetching_tiles:
+            continue
+        _fetching_tiles.add(tile)
+        await fetch_tile(tile)
+        fetched += 1
+        if fetched % 10 == 0:
+            logger.info("France warmup: %d/%d tiles done", fetched, len(missing))
+    logger.info("France warmup: complete (%d tiles fetched)", fetched)
 
 
 # --- App ---
