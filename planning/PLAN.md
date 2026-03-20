@@ -1,8 +1,8 @@
 # plan — kampeerhub
 
 ##  Huidige staat
-Laatste wijziging: E2E tests toegevoegd (Playwright, 14/14 geslaagd) ✓ (2026-03-19)
-Volgende: nieuwe Jira features of resterende MEDIUM/LOW review issues
+Laatste wijziging: Secret scanning fix — .playwright-mcp/ uit git history verwijderd (2026-03-20)
+Volgende: nieuwe Jira features of resterende LOW/INFO review issues
 Open: LOW/INFO issues uit code review, backend unit tests
 Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatPanel retry/timeout logica
 
@@ -61,6 +61,7 @@ Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatP
 | KAM-17 landingspagina redesign | Done | Unsplash campingfoto achtergrond; glazen kaart; alles Nederlands |
 | Security fixes (review CRITICAL+HIGH) | Done | Sessie expiry 30d; RegisterRequest validatie; AdminUpdateRequest model + 404 + admin-guard; /api/chat auth; hydration fix; water filter tooFarOut; AbortController water+weather; handleSubmit catch |
 | E2E tests | Done | Playwright; `test/` met globalSetup, 14 tests (auth/admin/api/app), LLM_MOCK=true, tmpfs DB |
+| Secret scanning fix | Done | `.playwright-mcp/` uit git history verwijderd via `git filter-repo`; Google API key was per ongeluk in consolelog beland; force-push naar main |
 | Backend unit tests | Not started | |
 
 ---
