@@ -128,8 +128,21 @@ Dataset: 1080 campings met website-tag uit Overpass (centraal/zuidelijk Frankrij
 - ~20%: onbereikbaar/geen boeking → alleen homepage
 - ~30%: onbekend/eigen systeem → homepage zonder datums
 
-**Technische aanpak:**
-Boekingslink-detectie kan asynchroon in de backend (net als Overpass tile cache): één keer de camping-website ophalen, de booking-link extraheren en opslaan in SQLite. Herkenning via regex op bekende domeinen in `href`-attributen. Geen Playwright nodig — gewone HTTP fetch is voldoende.
+**Technische aanpak (afgevoerd):**
+Async HTTP-scan per camping in de backend (net als Overpass tile cache). Afgevoerd: platform is al op het randje van te traag voor de gebruiker — extra background HTTP-verkeer op Render is niet haalbaar.
+
+### Alternatieve aanpakken (zonder extra runtime latency)
+
+**Optie A — Omgekeerde richting: begin bij Secureholiday**
+Secureholiday heeft een zoekpagina per regio met beschikbaarheid per datum. Eén request → lijst beschikbare campings → cross-referentie met OSM via naam/coördinaten. Alleen matchende campings tonen. Nadeel: dekt alleen ~35% (Secureholiday-aangesloten campings). Voordeel: één externe call, geen scanning.
+
+**Optie B — GitHub Actions nachtelijke scanner (buiten Render)**
+Scan draait wél, maar niet op Render: GitHub Actions cron job scant campingwebsites nachtelijks, detecteert boekingssystemen, commit resultaten als `data/booking_systems.json`. Render leest alleen dat statische bestand — nul runtime HTTP, nul latency. Gratis op GitHub Actions. Update wekelijks/maandelijks.
+
+**Optie C — Puur frontend, nul backend (Eurocampings met datums)**
+Datumvelden toevoegen aan de UI (aankomst + vertrek). Eurocampings-link krijgt datum-parameters mee → gebruiker landt direct op de juiste zoekpagina met datums vooringevuld. Geen backend-aanpassing. Bereik: 100% van campings krijgt een "controleer beschikbaarheid"-link. Geen echte beschikbaarheidsbevestiging, wel betere UX.
+
+**Aanbevolen combinatie:** Optie C als basislaag (vandaag te bouwen) + Optie A als verrijkingslaag (~35% krijgt echte beschikbaarheidsdata).
 
 ---
 
