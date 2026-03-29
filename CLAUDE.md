@@ -73,6 +73,36 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 
 ---
 
+## Toekomstige feature: beschikbaarheid op datum (onderzocht 2026-03-29)
+
+### Kernidee
+Gebruiker geeft aankomst- en vertrekdatum op; app toont alleen campings met beschikbaarheid in dat window.
+
+### Onderzochte opties en conclusies
+
+| Optie | Conclusie |
+|---|---|
+| **Pitchup.com API** | Supply-side API (campings pushen inventory naar Pitchup). Geen publieke zoek-API voor derden. Formeel partnerschap vereist — commercieel, niet gratis. |
+| **ACSI / Eurocampings** | Geen publieke API beschikbaar. |
+| **iCal-feeds** | Technisch mogelijk (Beds24, Lodgify, Smoobu publiceren standaard iCal). Bottleneck: iCal-URL per camping ontdekken is niet schaalbaar. |
+| **Keten-scraping** (Tohapi, Huttopia, Homair, Yelloh Village) | Scrapeable JSON, maar dekt alleen ~300 campings in Frankrijk. Fragiel + juridisch grijs. |
+| **Real-time Playwright** | Te traag voor gebruiker. Niet performant te krijgen. |
+| **Background async scraping + cache** | Werkt in theorie (nachtelijks crawlen, 90 dagen vooruit, SQLite opslag). Hoge buildcomplexiteit en onderhoudslast. |
+
+### Gekozen richting voor verdere uitwerking
+**Datum-aware deeplinks**: gebruiker geeft datums in → app genereert directe deeplinks naar boekingspagina van elke camping **met datum-parameters vooringevuld** in de URL. Veel boekingssystemen accepteren dit (Booking.com, eigen campingsites, Pitchup). Geen echte beschikbaarheidsdata, maar betere UX dan nu + dramatisch lagere complexiteit.
+
+Voorbeeldaanpak:
+- `arrival` en `departure` datumvelden toevoegen aan de UI (bijv. in FilterPanel of header)
+- OSM `website` tag + Eurocampings fallback URL uitbreiden met datum-parameters waar het systeem het toestaat
+- In DetailOverlay: "Controleer beschikbaarheid" knop die de boekingslink opent met datums
+
+### Nog niet onderzocht
+- Welke URL-parameters accepteren gangbare campingboekingssystemen (Booking Experts, Recreatex, CampManager)?
+- Kan Pitchup zoekresultaten-pagina gescraped worden voor beschikbaarheidsindicatie (niet officieel)?
+
+---
+
 ## Aandachtspunten
 
 - **Overpass rate limiting**: opgelost via backend SQLite tile cache. Elke 1°×1° tile wordt één keer opgehaald en permanent opgeslagen. asyncio.Lock voorkomt gelijktijdige requests. Globale cooldown van 60s na 429, gedeeld tussen camping- en water-tiles. Frontend pollt alleen, doet zelf geen Overpass calls.
