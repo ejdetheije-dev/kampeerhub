@@ -21,9 +21,10 @@ interface ChatPanelProps {
   onSetTravelRange?: (hours: number) => void;
   onSelectCamping?: (name: string) => void;
   authToken?: string | null;
+  fullHeight?: boolean;
 }
 
-export default function ChatPanel({ onSetFilters, onNavigateMap, onSetTravelRange, onSelectCamping, authToken }: ChatPanelProps) {
+export default function ChatPanel({ onSetFilters, onNavigateMap, onSetTravelRange, onSelectCamping, authToken, fullHeight }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     { role: "assistant", content: "Hallo! Ik ben kampeerhub. Waar wil je naartoe kamperen?" },
   ]);
@@ -99,7 +100,7 @@ export default function ChatPanel({ onSetFilters, onNavigateMap, onSetTravelRang
   }
 
   return (
-    <div className="flex flex-col border-t border-gray-800 h-72 shrink-0">
+    <div className={`flex flex-col border-t border-gray-800 ${fullHeight ? "flex-1" : "h-72 shrink-0"}`}>
       <div className="px-4 py-2 border-b border-gray-800 shrink-0">
         <span className="text-xs text-gray-400 uppercase tracking-wider">AI assistent</span>
       </div>

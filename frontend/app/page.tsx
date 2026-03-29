@@ -59,8 +59,17 @@ function AppContent({ isAdmin, onLogout, authToken }: { isAdmin: boolean; onLogo
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [travelHours, setTravelHours] = useState<number>(0);
+  const [showList, setShowList] = useState(true);
+  const [showChat, setShowChat] = useState(true);
   const mapFlyToRef = useRef<((lat: number, lon: number, zoom: number) => void) | null>(null);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setShowList(false);
+      setShowChat(false);
+    }
+  }, []);
   const [campingNotFound, setCampingNotFound] = useState<string | null>(null);
   const { campings, loading, error, tooFarOut } = useOverpass(bounds);
   const waterPoints = useWaterBodies(bounds, filters.waterMaxKm !== null);
@@ -118,14 +127,30 @@ function AppContent({ isAdmin, onLogout, authToken }: { isAdmin: boolean; onLogo
       <header className="flex items-center px-4 h-12 border-b border-gray-800 shrink-0">
         <span className="text-[#ecad0a] font-bold text-lg tracking-wide">kampeerhub</span>
         <span className="ml-3 text-gray-400 text-sm">camping zoeker</span>
-        <span
-          className={`ml-auto w-2 h-2 rounded-full ${error ? "bg-red-400" : loading ? "bg-yellow-400" : "bg-green-400"}`}
-          title={error ? "fout" : loading ? "laden..." : "verbonden"}
-        />
-        {isAdmin && (
-          <a href="/admin" className="ml-4 text-xs text-gray-500 hover:text-gray-300 transition-colors">beheer</a>
-        )}
-        <button onClick={onLogout} className="ml-4 text-xs text-gray-500 hover:text-gray-300 transition-colors">uitloggen</button>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => setShowList((v) => !v)}
+            className={`text-xs px-2 py-1 rounded border transition-colors ${showList ? "border-[#ecad0a] text-[#ecad0a]" : "border-gray-700 text-gray-500 hover:text-gray-300"}`}
+            title="Lijst tonen/verbergen"
+          >
+            lijst
+          </button>
+          <button
+            onClick={() => setShowChat((v) => !v)}
+            className={`text-xs px-2 py-1 rounded border transition-colors ${showChat ? "border-[#209dd7] text-[#209dd7]" : "border-gray-700 text-gray-500 hover:text-gray-300"}`}
+            title="Chat tonen/verbergen"
+          >
+            chat
+          </button>
+          <span
+            className={`ml-2 w-2 h-2 rounded-full ${error ? "bg-red-400" : loading ? "bg-yellow-400" : "bg-green-400"}`}
+            title={error ? "fout" : loading ? "laden..." : "verbonden"}
+          />
+          {isAdmin && (
+            <a href="/admin" className="ml-2 text-xs text-gray-500 hover:text-gray-300 transition-colors">beheer</a>
+          )}
+          <button onClick={onLogout} className="ml-2 text-xs text-gray-500 hover:text-gray-300 transition-colors">uitloggen</button>
+        </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
@@ -158,51 +183,58 @@ function AppContent({ isAdmin, onLogout, authToken }: { isAdmin: boolean; onLogo
           )}
         </div>
 
-        <div className="w-96 flex flex-col border-l border-gray-800 shrink-0 overflow-hidden">
-          <CampingList
-            campings={filteredCampings}
-            totalCount={sortedCampings.length}
-            loading={loading}
-            error={error}
-            tooFarOut={tooFarOut}
-            selectedId={selectedId}
-            onSelect={handleSelectCamping}
-            filters={filters}
-            onFiltersChange={setFilters}
-            capacityDataPct={capacityDataPct}
-            favorites={favorites}
-            onToggleFavorite={toggleFavorite}
-            showFavoritesOnly={showFavoritesOnly}
-            onToggleFavoritesOnly={() => setShowFavoritesOnly((v) => !v)}
-          />
-          <ChatPanel
-            onSetFilters={(patch) =>
-              setFilters((f) => ({
-                ...f,
-                ...(patch.dog !== undefined ? { dog: patch.dog! } : {}),
-                ...(patch.wifi !== undefined ? { wifi: patch.wifi! } : {}),
-                ...(patch.pool !== undefined ? { pool: patch.pool! } : {}),
-                ...(patch.size_type !== undefined && (["all", "small", "medium", "large", "naturist"] as const).includes(patch.size_type as SizeType) ? { sizeType: patch.size_type as SizeType } : {}),
-                ...(patch.water_max_km !== undefined ? { waterMaxKm: patch.water_max_km } : {}),
-              }))
-            }
-            onNavigateMap={(lat, lon, zoom) => mapFlyToRef.current?.(lat, lon, zoom)}
-            onSetTravelRange={setTravelHours}
-            authToken={authToken}
-            onSelectCamping={(name) => {
-              const found = campings.find((c) =>
-                c.name.toLowerCase().includes(name.toLowerCase())
-              );
-              if (found) {
-                handleSelectCamping(found);
-                setCampingNotFound(null);
-              } else {
-                setCampingNotFound(name);
-                setTimeout(() => setCampingNotFound(null), 4000);
-              }
-            }}
-          />
-        </div>
+        {(showList || showChat) && (
+          <div className="w-80 md:w-96 flex flex-col border-l border-gray-800 shrink-0 overflow-hidden">
+            {showList && (
+              <CampingList
+                campings={filteredCampings}
+                totalCount={sortedCampings.length}
+                loading={loading}
+                error={error}
+                tooFarOut={tooFarOut}
+                selectedId={selectedId}
+                onSelect={handleSelectCamping}
+                filters={filters}
+                onFiltersChange={setFilters}
+                capacityDataPct={capacityDataPct}
+                favorites={favorites}
+                onToggleFavorite={toggleFavorite}
+                showFavoritesOnly={showFavoritesOnly}
+                onToggleFavoritesOnly={() => setShowFavoritesOnly((v) => !v)}
+              />
+            )}
+            {showChat && (
+              <ChatPanel
+                onSetFilters={(patch) =>
+                  setFilters((f) => ({
+                    ...f,
+                    ...(patch.dog !== undefined ? { dog: patch.dog! } : {}),
+                    ...(patch.wifi !== undefined ? { wifi: patch.wifi! } : {}),
+                    ...(patch.pool !== undefined ? { pool: patch.pool! } : {}),
+                    ...(patch.size_type !== undefined && (["all", "small", "medium", "large", "naturist"] as const).includes(patch.size_type as SizeType) ? { sizeType: patch.size_type as SizeType } : {}),
+                    ...(patch.water_max_km !== undefined ? { waterMaxKm: patch.water_max_km } : {}),
+                  }))
+                }
+                onNavigateMap={(lat, lon, zoom) => mapFlyToRef.current?.(lat, lon, zoom)}
+                onSetTravelRange={setTravelHours}
+                authToken={authToken}
+                fullHeight={!showList}
+                onSelectCamping={(name) => {
+                  const found = campings.find((c) =>
+                    c.name.toLowerCase().includes(name.toLowerCase())
+                  );
+                  if (found) {
+                    handleSelectCamping(found);
+                    setCampingNotFound(null);
+                  } else {
+                    setCampingNotFound(name);
+                    setTimeout(() => setCampingNotFound(null), 4000);
+                  }
+                }}
+              />
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
