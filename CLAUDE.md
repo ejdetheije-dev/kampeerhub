@@ -90,16 +90,46 @@ Gebruiker geeft aankomst- en vertrekdatum op; app toont alleen campings met besc
 | **Background async scraping + cache** | Werkt in theorie (nachtelijks crawlen, 90 dagen vooruit, SQLite opslag). Hoge buildcomplexiteit en onderhoudslast. |
 
 ### Gekozen richting voor verdere uitwerking
-**Datum-aware deeplinks**: gebruiker geeft datums in → app genereert directe deeplinks naar boekingspagina van elke camping **met datum-parameters vooringevuld** in de URL. Veel boekingssystemen accepteren dit (Booking.com, eigen campingsites, Pitchup). Geen echte beschikbaarheidsdata, maar betere UX dan nu + dramatisch lagere complexiteit.
+**Datum-aware deeplinks**: gebruiker geeft datums in → app genereert directe deeplinks naar boekingspagina van elke camping **met datum-parameters vooringevuld** in de URL. Geen echte beschikbaarheidsdata, maar betere UX dan nu + dramatisch lagere complexiteit.
 
 Voorbeeldaanpak:
 - `arrival` en `departure` datumvelden toevoegen aan de UI (bijv. in FilterPanel of header)
-- OSM `website` tag + Eurocampings fallback URL uitbreiden met datum-parameters waar het systeem het toestaat
-- In DetailOverlay: "Controleer beschikbaarheid" knop die de boekingslink opent met datums
+- Backend detecteert boekingssysteem via HTML-scan (zie empirisch onderzoek hieronder)
+- In DetailOverlay: "Controleer beschikbaarheid" knop die de boekingslink opent met datums vooringevuld
 
-### Nog niet onderzocht
-- Welke URL-parameters accepteren gangbare campingboekingssystemen (Booking Experts, Recreatex, CampManager)?
-- Kan Pitchup zoekresultaten-pagina gescraped worden voor beschikbaarheidsindicatie (niet officieel)?
+### Empirisch onderzoek — boekingssystemen (2026-03-29)
+
+Dataset: 1080 campings met website-tag uit Overpass (centraal/zuidelijk Frankrijk, bbox 44-47°N / 2-6°O)
+
+**Wat de URLs zeggen (geen fetch nodig):**
+- 99% eigen domein — URL zelf verraadt het boekingssysteem niet
+- ~1% herkend platform in de URL (e-camping.net: 24, aquadis: 7, gites-de-france: 4)
+
+**Wat de HTML verraadt (60-site sample, 47 bereikbaar):**
+
+| Systeem | Hits | URL-patroon |
+|---|---|---|
+| **Secureholiday (Ctoutvert)** | ~10 | `*.secureholiday.net/?BeginDate=DD/MM/YYYY&EndDate=DD/MM/YYYY` |
+| Yelloh Village | 4 | `booking.yellohvillage.com` |
+| resa-booking.com | 3 | `online.resa-booking.com` |
+| Reservit | 2 | `secure.reservit.com` — heeft gedocumenteerde URL-params |
+| Eigen domein/onbekend | 8 | — |
+| Geen boekingssysteem gevonden | 21 | — |
+
+**Conclusies:**
+- **Secureholiday/Ctoutvert** is de marktleider voor Franse campings. Datum-params zijn gedocumenteerd en werken.
+- **~20% van sites onbereikbaar** (timeout, oud SSL, 404) — niet alle campings hebben een werkende site
+- **~45% van bereikbare sites** heeft geen herkend boekingssysteem (eigen systeem of geen online boeking)
+- Booking.com en Pitchup komen nauwelijks voor als embedded systeem — initiële aanname was onjuist
+
+**Geschat bereik van datum-aware deeplinks:**
+- ~30-40%: Secureholiday/Reservit/resa-booking → datum direct vooringevuld
+- ~10%: ketens (Yelloh, Capfun) → directe link
+- ~20%: onbereikbaar/geen boeking → alleen homepage
+- ~30%: onbekend/eigen systeem → homepage zonder datums
+
+**Technische aanpak:**
+Boekingslink-detectie kan asynchroon in de backend (net als Overpass tile cache): één keer de camping-website ophalen, de booking-link extraheren en opslaan in SQLite. Herkenning via regex op bekende domeinen in `href`-attributen. Geen Playwright nodig — gewone HTTP fetch is voldoende.
 
 ---
 
