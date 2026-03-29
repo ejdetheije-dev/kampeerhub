@@ -1,7 +1,7 @@
 # plan — kampeerhub
 
 ##  Huidige staat
-Laatste wijziging: KAM-19 REVERTED (2026-03-20) — warmup/prefetch veroorzaakten Overpass rate limiting op Render; teruggedraaid naar pre-KAM-19 on-demand laden (commit c58934b)
+Laatste wijziging: KAM-20 DONE (2026-03-29) — telefoon-first UI: toggle-knoppen voor lijst en chat in header; op mobile (< 768px) standaard verborgen zodat kaart vol scherm gebruikt (commit f8e2f51)
 Volgende: nieuwe Jira features of resterende LOW/INFO review issues
 Open: LOW/INFO issues uit code review, backend unit tests
 Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatPanel retry/timeout logica
@@ -64,6 +64,7 @@ Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatP
 | Secret scanning fix | Done | `.playwright-mcp/` uit git history verwijderd via `git filter-repo`; Google API key was per ongeluk in consolelog beland; force-push naar main |
 | KAM-18 3D satellietflyover | Done | Mapbox GL JS in DetailOverlay; token runtime via `/api/config`; satelliet+terrain stijl; rAF rotatieanimatie; lazy-loaded; Render deploy werkend |
 | KAM-19 laadoptimalisatie | Reverted | Warmup+prefetch blokkeerden Overpass op Render → gebruikersverzoeken faalden; teruggedraaid (c58934b). Overpass rate limiting op gedeeld Render IP is het kernprobleem. |
+| KAM-20 telefoon-first UI | Done | Toggle-knoppen voor lijst/chat in header; mobile (< 768px) start met kaart volledig scherm; sidebar verdwijnt als beide verborgen; ChatPanel vult volledige hoogte als lijst verborgen |
 | Backend unit tests | Not started | |
 
 ---

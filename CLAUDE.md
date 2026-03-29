@@ -69,6 +69,7 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 20. **Security fixes** — DONE: sessie tokens verlopen na 30 dagen; RegisterRequest validatie (min/max fields); AdminUpdateRequest Pydantic model + 404 guard + admin-lockout guard; `/api/chat` vereist Bearer token; hydration fix via useEffect; water slider disabled bij tooFarOut; AbortController in useWaterBodies + DetailOverlay weather; catch in handleSubmit
 21. **E2E tests** — DONE: Playwright in `test/`; `docker-compose.test.yml` (LLM_MOCK=true, tmpfs DB, poort 8001); `globalSetup.ts` maakt admin aan vóór tests; 14 tests in 4 bestanden (auth/admin/api/app); alle 14 geslaagd in ~22s
 22. **KAM-19 laadoptimalisatie** — REVERTED: warmup/prefetch/adaptive polling veroorzaakten Overpass rate limiting op Render waardoor gebruikersverzoeken ook blokkeerden; teruggedraaid naar pre-KAM-19 on-demand laden (commit c58934b)
+23. **Telefoon-first UI** — DONE (KAM-20): toggle-knoppen "lijst" en "chat" in header; op mobile (< 768px) standaard verborgen zodat kaart vol scherm in landscape; `fullHeight` prop op ChatPanel vult zijbalk als lijst verborgen is
 
 ---
 
