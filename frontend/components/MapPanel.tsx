@@ -107,7 +107,22 @@ export default function MapPanel({ onBoundsChange, campings = [], filteredIds, s
         const isCozy = camping.tags?.cozy === true;
         const size = isSelected ? 14 : 10;
         const dimmed = isFiltered || outOfReach;
-        const color = isSelected ? "#ecad0a" : dimmed ? "#555" : isCozy ? "#4caf50" : "#209dd7";
+        const avail = camping.availability;
+        let color: string;
+        if (isSelected) color = "#ecad0a";
+        else if (dimmed) color = "#555";
+        else if (avail) {
+          switch (avail.label) {
+            case "Waarschijnlijk beschikbaar": color = "#4caf50"; break;
+            case "Onzeker": color = "#f59e0b"; break;
+            case "Waarschijnlijk vol":
+            case "Regio structureel vol": color = "#ef4444"; break;
+            case "Minimumverblijf waarschijnlijk": color = "#f97316"; break;
+            default: color = isCozy ? "#4caf50" : "#209dd7";
+          }
+        } else {
+          color = isCozy ? "#4caf50" : "#209dd7";
+        }
         const opacity = dimmed ? 0.35 : 1;
         const icon = L.divIcon({
           className: "",
@@ -135,7 +150,11 @@ export default function MapPanel({ onBoundsChange, campings = [], filteredIds, s
         });
 
         const marker = L.marker([camping.lat, camping.lon], { icon });
-        marker.bindTooltip(camping.name, { direction: "top", offset: [0, -8] });
+        const showAvail = avail && avail.label !== "Onvoldoende data";
+        marker.bindTooltip(
+          showAvail ? `${camping.name} — ${avail!.label}` : camping.name,
+          { direction: "top", offset: [0, -8] },
+        );
         marker.on("click", () => onSelectCampingRef.current?.(camping));
         marker.addTo(layerGroup);
       });
