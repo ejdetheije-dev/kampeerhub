@@ -193,12 +193,9 @@ def availability_score(camping: dict, arrival_str: str, departure_str: str) -> d
     if capacity is not None and capacity > 200 and month in _PEAK_MONTHS and nights < 7:
         return {"label": "Minimumverblijf waarschijnlijk", "p": None}
 
-    # Insufficient data: no Atout France match (cozy=False requires AF match) and no capacity
     cozy = tags.get("cozy", False)
-    if capacity is None and not cozy:
-        return {"label": "Onvoldoende data", "p": None}
 
-    # Step 3: Log-odds model
+    # Step 3: Log-odds model (always compute, even without capacity — national average is still useful)
     log_odds = _logit(_MONTHLY_PRIOR.get(month, 0.15))
 
     if any(_in_school_holidays(arrival + _td(days=i)) for i in range(min(nights, 30))):
