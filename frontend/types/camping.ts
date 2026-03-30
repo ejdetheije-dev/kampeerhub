@@ -6,6 +6,11 @@ export interface Bounds {
   zoom: number;
 }
 
+export interface AvailabilityInfo {
+  label: string;
+  p: number | null;
+}
+
 export interface Camping {
   id: string;
   name: string;
@@ -21,8 +26,10 @@ export interface Camping {
     fee?: string;
     charge?: string;
     website?: string;
+    reservation?: string;
     cozy?: boolean;
   };
+  availability?: AvailabilityInfo;
 }
 
 export type SizeType = "all" | "small" | "medium" | "large" | "naturist";

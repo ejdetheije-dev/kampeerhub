@@ -5,6 +5,7 @@ import MapPanel from "@/components/MapPanel";
 import CampingList from "@/components/CampingList";
 import ChatPanel from "@/components/ChatPanel";
 import { useOverpass } from "@/hooks/useOverpass";
+import type { Dates } from "@/hooks/useOverpass";
 import { useWaterBodies } from "@/hooks/useWaterBodies";
 import { useFavorites } from "@/hooks/useFavorites";
 import DetailOverlay from "@/components/DetailOverlay";
@@ -61,6 +62,7 @@ function AppContent({ isAdmin, onLogout, authToken }: { isAdmin: boolean; onLogo
   const [travelHours, setTravelHours] = useState<number>(0);
   const [showList, setShowList] = useState(true);
   const [showChat, setShowChat] = useState(true);
+  const [dates, setDates] = useState<Dates | null>(null);
   const mapFlyToRef = useRef<((lat: number, lon: number, zoom: number) => void) | null>(null);
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
 
@@ -71,7 +73,7 @@ function AppContent({ isAdmin, onLogout, authToken }: { isAdmin: boolean; onLogo
     }
   }, []);
   const [campingNotFound, setCampingNotFound] = useState<string | null>(null);
-  const { campings, loading, error, tooFarOut } = useOverpass(bounds);
+  const { campings, loading, error, tooFarOut } = useOverpass(bounds, dates);
   const waterPoints = useWaterBodies(bounds, filters.waterMaxKm !== null);
   const { favorites, toggleFavorite } = useFavorites();
 
@@ -201,6 +203,8 @@ function AppContent({ isAdmin, onLogout, authToken }: { isAdmin: boolean; onLogo
                 onToggleFavorite={toggleFavorite}
                 showFavoritesOnly={showFavoritesOnly}
                 onToggleFavoritesOnly={() => setShowFavoritesOnly((v) => !v)}
+                dates={dates}
+                onDatesChange={setDates}
               />
             )}
             {showChat && (
@@ -219,6 +223,7 @@ function AppContent({ isAdmin, onLogout, authToken }: { isAdmin: boolean; onLogo
                 onSetTravelRange={setTravelHours}
                 authToken={authToken}
                 fullHeight={!showList}
+                onSetDates={(d) => setDates(d)}
                 onSelectCamping={(name) => {
                   const found = campings.find((c) =>
                     c.name.toLowerCase().includes(name.toLowerCase())

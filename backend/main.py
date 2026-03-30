@@ -12,6 +12,7 @@ import sqlite3
 import time
 import unicodedata
 from contextlib import asynccontextmanager, closing
+from datetime import date as _date, timedelta as _td
 from pathlib import Path
 from typing import Literal
 
@@ -60,13 +61,20 @@ Beschikbare acties (gebruik de juiste op basis van de vraag):
 4. select_camping — camping selecteren op naam:
    - camping_name: naam van de camping
 
-5. none — alleen een antwoord, geen actie
+5. set_dates — aankomst- en vertrekdatum instellen:
+   - arrival: datum in YYYY-MM-DD formaat
+   - departure: datum in YYYY-MM-DD formaat
+
+6. none — alleen een antwoord, geen actie
 
 Voorbeeldresponse voor "ga naar bordeaux":
 {"message": "Ik navigeer naar Bordeaux.", "action": "navigate_map", "navigate": {"location_name": "Bordeaux"}}
 
 Voorbeeldresponse voor "filter op honden":
-{"message": "Filter ingesteld: alleen campings waar honden welkom zijn.", "action": "set_filters", "filters": {"dog": true}}"""
+{"message": "Filter ingesteld: alleen campings waar honden welkom zijn.", "action": "set_filters", "filters": {"dog": true}}
+
+Voorbeeldresponse voor "ik ga van 15 tot 22 augustus":
+{"message": "Ik stel de datums in: 15 tot 22 augustus.", "action": "set_dates", "dates": {"arrival": "2025-08-15", "departure": "2025-08-22"}}"""
 
 MOCK_RESPONSE = '{"message": "Dit is een testantwoord. LLM_MOCK is ingeschakeld.", "action": "none"}'
 
@@ -83,6 +91,145 @@ _overpass_cooldown_until: float = 0             # global cooldown after any 429
 COOLDOWN_SECONDS = 60
 _geocode_cache: dict[str, tuple[float, float]] = {}  # location_name -> (lat, lon)
 _atout_france_lookup: dict[str, dict] = {}           # normalized name -> AF data
+
+# --- Availability scoring (static data, no runtime API calls) ---
+
+# French school holiday date ranges 2025-2027 (approximate national averages)
+_SCHOOL_HOLIDAY_RANGES: list[tuple[str, str]] = [
+    ("2025-04-19", "2025-05-04"),
+    ("2025-07-05", "2025-09-02"),
+    ("2025-10-18", "2025-11-03"),
+    ("2025-12-20", "2026-01-05"),
+    ("2026-02-07", "2026-02-23"),
+    ("2026-04-04", "2026-04-20"),
+    ("2026-07-04", "2026-09-01"),
+    ("2026-10-17", "2026-11-02"),
+    ("2026-12-19", "2027-01-04"),
+    ("2027-02-13", "2027-03-01"),
+    ("2027-04-10", "2027-04-26"),
+    ("2027-07-03", "2027-08-31"),
+]
+
+# Static French public holidays (month, day)
+_FR_PUBLIC_HOLIDAYS: frozenset[tuple[int, int]] = frozenset({
+    (1, 1), (5, 1), (5, 8), (7, 14), (8, 15), (11, 1), (11, 11), (12, 25)
+})
+
+# National monthly occupancy prior (INSEE Fréquentation des campings)
+_MONTHLY_PRIOR: dict[int, float] = {
+    1: 0.07, 2: 0.09, 3: 0.12, 4: 0.20, 5: 0.30,
+    6: 0.50, 7: 0.78, 8: 0.83, 9: 0.38, 10: 0.18, 11: 0.08, 12: 0.07,
+}
+_PEAK_MONTHS: frozenset[int] = frozenset({7, 8})
+
+# Structurally saturated tourist regions (name, center_lat, center_lon, radius_km)
+_SATURATED_REGIONS: list[tuple[str, float, float, float]] = [
+    ("Île de Ré",      46.22, -1.38, 15.0),
+    ("Arcachon",       44.66, -1.17, 28.0),
+    ("Côte d'Azur",    43.55,  7.02, 60.0),
+    ("Languedoc côte", 43.40,  3.90, 80.0),
+    ("Vendée côte",    46.47, -1.82, 35.0),
+    ("Biarritz",       43.48, -1.56, 25.0),
+    ("Quiberon",       47.48, -3.10, 20.0),
+    ("Cap d'Agde",     43.28,  3.51, 15.0),
+]
+
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    R = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    return R * 2 * math.asin(math.sqrt(a))
+
+
+def _in_school_holidays(d: "_date") -> bool:
+    for start_str, end_str in _SCHOOL_HOLIDAY_RANGES:
+        if _date.fromisoformat(start_str) <= d <= _date.fromisoformat(end_str):
+            return True
+    return False
+
+
+def _in_saturated_region(lat: float, lon: float) -> bool:
+    return any(_haversine_km(lat, lon, clat, clon) <= r for _, clat, clon, r in _SATURATED_REGIONS)
+
+
+def _logit(p: float) -> float:
+    return math.log(max(0.01, min(0.99, p)) / (1 - max(0.01, min(0.99, p))))
+
+
+def _sigmoid(x: float) -> float:
+    return 1.0 / (1.0 + math.exp(-x))
+
+
+def availability_score(camping: dict, arrival_str: str, departure_str: str) -> dict:
+    """Probabilistic availability estimate based on static data. No runtime API calls."""
+    try:
+        arrival = _date.fromisoformat(arrival_str)
+        departure = _date.fromisoformat(departure_str)
+    except ValueError:
+        return {"label": "Onvoldoende data", "p": None}
+
+    nights = (departure - arrival).days
+    if nights <= 0:
+        return {"label": "Onvoldoende data", "p": None}
+
+    tags = camping.get("tags", {})
+    lat, lon = camping["lat"], camping["lon"]
+
+    # Step 1: Elimination
+    if tags.get("reservation") == "required":
+        return {"label": "Niet online te boeken", "p": None}
+
+    mid = arrival + _td(days=nights // 2)
+    month = mid.month
+
+    # Step 2: Saturated region during peak
+    if month in _PEAK_MONTHS and _in_saturated_region(lat, lon):
+        return {"label": "Regio structureel vol", "p": 0.05}
+
+    # Large camping + peak + short stay → minimum stay likely required
+    capacity = tags.get("capacity")
+    if capacity is not None and capacity > 200 and month in _PEAK_MONTHS and nights < 7:
+        return {"label": "Minimumverblijf waarschijnlijk", "p": None}
+
+    # Insufficient data: no Atout France match (cozy=False requires AF match) and no capacity
+    cozy = tags.get("cozy", False)
+    if capacity is None and not cozy:
+        return {"label": "Onvoldoende data", "p": None}
+
+    # Step 3: Log-odds model
+    log_odds = _logit(_MONTHLY_PRIOR.get(month, 0.15))
+
+    if any(_in_school_holidays(arrival + _td(days=i)) for i in range(min(nights, 30))):
+        log_odds += 0.7
+    if any(((arrival + _td(days=i)).month, (arrival + _td(days=i)).day) in _FR_PUBLIC_HOLIDAYS
+           for i in range(min(nights, 14))):
+        log_odds += 0.25
+
+    if cozy or (capacity is not None and capacity < 30):
+        log_odds += 0.5   # Small campings fill faster
+    elif capacity is not None and capacity > 200:
+        log_odds -= 0.2   # More supply
+
+    # Cancellation window: 3-5 weeks before peak frees up spots
+    days_until = (arrival - _date.today()).days
+    if 21 <= days_until <= 42 and month in _PEAK_MONTHS:
+        log_odds -= 0.3
+
+    p_occupied = _sigmoid(log_odds)
+
+    # Step 4: Duration correction
+    p_available = (1.0 - p_occupied) ** (nights / 7.0)
+
+    if p_available > 0.5:
+        label = "Waarschijnlijk beschikbaar"
+    elif p_available > 0.2:
+        label = "Onzeker"
+    else:
+        label = "Waarschijnlijk vol"
+
+    return {"label": label, "p": round(p_available, 2)}
 
 def _hash_password(password: str) -> str:
     return _bcrypt_lib.hashpw(password.encode(), _bcrypt_lib.gensalt()).decode()
@@ -281,6 +428,7 @@ def store_tile(elements: list, tile_key: str) -> None:
                 "fee":         t.get("fee"),
                 "charge":      t.get("charge"),
                 "website":     t.get("website") or t.get("url"),
+                "reservation": t.get("reservation"),
                 "cozy":        False,
             }
             con.execute(
@@ -477,7 +625,11 @@ app = FastAPI(title="kampeerhub", lifespan=lifespan)
 
 
 @app.get("/api/campings")
-async def campings_endpoint(south: float, west: float, north: float, east: float) -> dict:
+async def campings_endpoint(
+    south: float, west: float, north: float, east: float,
+    arrival: str | None = None,
+    departure: str | None = None,
+) -> dict:
     """Return cached campings immediately; start background fetch for missing tiles."""
     if not (-90 <= south < north <= 90) or not (-180 <= west <= 180) or not (-180 <= east <= 180):
         raise HTTPException(status_code=422, detail="Ongeldige bounding box parameters")
@@ -499,6 +651,9 @@ async def campings_endpoint(south: float, west: float, north: float, east: float
         asyncio.create_task(fetch_tile(tile))
 
     result = await asyncio.to_thread(get_campings_in_bbox, south, west, north, east)
+    if arrival and departure:
+        for c in result:
+            c["availability"] = availability_score(c, arrival, departure)
     # fetching=True as long as any tile is in-flight OR in cooldown (but not yet cached)
     fetching = any(
         t in _fetching_tiles or (not is_tile_cached(t) and now < _tile_retry_after.get(t, 0))
@@ -563,13 +718,19 @@ class NavigatePayload(BaseModel):
     zoom: int = 10
 
 
+class DatesPayload(BaseModel):
+    arrival: str    # YYYY-MM-DD
+    departure: str  # YYYY-MM-DD
+
+
 class ChatResponse(BaseModel):
     message: str
-    action: Literal["none", "set_filters", "navigate_map", "set_travel_range", "select_camping"] = "none"
+    action: Literal["none", "set_filters", "navigate_map", "set_travel_range", "select_camping", "set_dates"] = "none"
     filters: FiltersPayload | None = None
     navigate: NavigatePayload | None = None
     travel_hours: float | None = None
     camping_name: str | None = None   # for select_camping
+    dates: DatesPayload | None = None
 
 
 async def geocode(location_name: str) -> tuple[float, float] | None:

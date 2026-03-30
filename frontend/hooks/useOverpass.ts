@@ -17,7 +17,12 @@ function hasSignificantShift(prev: Bounds, next: Bounds): boolean {
   return latShift > SHIFT_THRESHOLD || lngShift > SHIFT_THRESHOLD;
 }
 
-export function useOverpass(bounds: Bounds | null) {
+export interface Dates {
+  arrival: string;
+  departure: string;
+}
+
+export function useOverpass(bounds: Bounds | null, dates: Dates | null = null) {
   const [campings, setCampings] = useState<Camping[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +33,8 @@ export function useOverpass(bounds: Bounds | null) {
   const cachedBoundsRef = useRef<Bounds | null>(null);
   const mountedRef = useRef(true);
   const abortRef = useRef<AbortController | null>(null);
+  const datesRef = useRef(dates);
+  datesRef.current = dates;
 
   const load = useCallback(async (b: Bounds) => {
     abortRef.current?.abort();
@@ -39,10 +46,10 @@ export function useOverpass(bounds: Bounds | null) {
 
     try {
       const { south, west, north, east } = b;
-      const res = await fetch(
-        `/api/campings?south=${south}&west=${west}&north=${north}&east=${east}`,
-        { signal: controller.signal },
-      );
+      const d = datesRef.current;
+      let url = `/api/campings?south=${south}&west=${west}&north=${north}&east=${east}`;
+      if (d) url += `&arrival=${d.arrival}&departure=${d.departure}`;
+      const res = await fetch(url, { signal: controller.signal });
       if (!res.ok) throw new Error(`${res.status}`);
       const data: { campings: Camping[]; fetching: boolean } = await res.json();
 
@@ -63,6 +70,17 @@ export function useOverpass(bounds: Bounds | null) {
       if (!controller.signal.aborted && mountedRef.current) setLoading(false);
     }
   }, []);
+
+  // Re-fetch when dates change (if bounds already loaded)
+  const datesKey = dates ? `${dates.arrival}|${dates.departure}` : "";
+  useEffect(() => {
+    const b = cachedBoundsRef.current;
+    if (b && b.zoom >= MIN_ZOOM) {
+      if (pollRef.current) clearTimeout(pollRef.current);
+      load(b);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datesKey]);
 
   useEffect(() => {
     if (!bounds) return;

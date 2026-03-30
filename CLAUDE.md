@@ -70,6 +70,7 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 21. **E2E tests** — DONE: Playwright in `test/`; `docker-compose.test.yml` (LLM_MOCK=true, tmpfs DB, poort 8001); `globalSetup.ts` maakt admin aan vóór tests; 14 tests in 4 bestanden (auth/admin/api/app); alle 14 geslaagd in ~22s
 22. **KAM-19 laadoptimalisatie** — REVERTED: warmup/prefetch/adaptive polling veroorzaakten Overpass rate limiting op Render waardoor gebruikersverzoeken ook blokkeerden; teruggedraaid naar pre-KAM-19 on-demand laden (commit c58934b)
 23. **Telefoon-first UI** — DONE (KAM-20): toggle-knoppen "lijst" en "chat" in header; op mobile (< 768px) standaard verborgen zodat kaart vol scherm in landscape; `fullHeight` prop op ChatPanel vult zijbalk als lijst verborgen is
+24. **Beschikbaarheidsfilter op datum** — TODO (KAM-21): probabilistisch model zonder runtime API-calls; datumrij bovenaan CampingList (native date inputs); AI chat `set_dates` action; statische databronnen: INSEE bezettingsgraad, schoolvakanties, feestdagen/ponts, verzadigde microregio-polygonen; log-odds model met verblijfsduurcorrectie; aanbodsdichtheid pre-computed bij tile-opslag
 
 ---
 
@@ -143,6 +144,31 @@ Scan draait wél, maar niet op Render: GitHub Actions cron job scant campingwebs
 Datumvelden toevoegen aan de UI (aankomst + vertrek). Eurocampings-link krijgt datum-parameters mee → gebruiker landt direct op de juiste zoekpagina met datums vooringevuld. Geen backend-aanpassing. Bereik: 100% van campings krijgt een "controleer beschikbaarheid"-link. Geen echte beschikbaarheidsbevestiging, wel betere UX.
 
 **Aanbevolen combinatie:** Optie C als basislaag (vandaag te bouwen) + Optie A als verrijkingslaag (~35% krijgt echte beschikbaarheidsdata).
+
+### Harde conclusie uit empirisch onderzoek (2026-03-29, n=60)
+
+**>70% dekking met echte availability-data is NIET haalbaar via scraping/aggregatie.**
+
+Empirische verdeling van 60 gesampled Franse campingwebsites:
+- **22% onbereikbaar** (timeout, oud SSL, 404)
+- **35% geen boekingssysteem** gevonden
+- **27% iframe aanwezig** maar systeem niet identificeerbaar
+- **3% Booking.com embedded** — initiële aanname van "40-50% dekking via Booking.com" is empirisch weerlegd
+- **3% Capfun/Yelloh** (ketens)
+- **Secureholiday max ~17%** (eerdere sample, betere detectie)
+
+**Wat dit betekent voor elke voorgestelde oplossing:**
+- Booking.com affiliate/reverse lookup → dekt hooguit 3-5% van Franse campings (die hebben Booking.com niet als boekingsengine)
+- Multi-platform aggregator (Booking + Pitchup + Secureholiday) → max ~35-40%, niet 70%
+- iCal subscriber model → URL-discovery onhaalbaar op schaal
+- GitHub Actions nachtscanner → detecteert systemen, maar systemen zijn er simpelweg niet voor 65%+ van campings
+
+**De fundamentele oorzaak:** Het merendeel van Franse campings heeft geen online boekingssysteem dat availability via een API of gestructureerde URL exposeert. Ze werken telefonisch, per e-mail, of via een eigen ongedocumenteerd formulier.
+
+**Enige scenario's die >70% haalbaar maken:**
+1. Supply-side onboarding: campings registreren zichzelf en voeren beschikbaarheid in (ander businessmodel)
+2. Partnerschap met bestaand platform dat al supply heeft (Pitchup, Camping.info)
+3. Probabilistisch model: beschikbaarheid schatten o.b.v. seizoen + capaciteit + populariteit (geen echte data, maar 100% dekking)
 
 ---
 

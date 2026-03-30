@@ -15,16 +15,22 @@ interface FiltersPayload {
   water_max_km?: number | null;
 }
 
+interface DatesPatch {
+  arrival: string;
+  departure: string;
+}
+
 interface ChatPanelProps {
   onSetFilters?: (patch: FiltersPayload) => void;
   onNavigateMap?: (lat: number, lon: number, zoom: number) => void;
   onSetTravelRange?: (hours: number) => void;
   onSelectCamping?: (name: string) => void;
+  onSetDates?: (dates: DatesPatch) => void;
   authToken?: string | null;
   fullHeight?: boolean;
 }
 
-export default function ChatPanel({ onSetFilters, onNavigateMap, onSetTravelRange, onSelectCamping, authToken, fullHeight }: ChatPanelProps) {
+export default function ChatPanel({ onSetFilters, onNavigateMap, onSetTravelRange, onSelectCamping, onSetDates, authToken, fullHeight }: ChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
     { role: "assistant", content: "Hallo! Ik ben kampeerhub. Waar wil je naartoe kamperen?" },
   ]);
@@ -83,6 +89,8 @@ export default function ChatPanel({ onSetFilters, onNavigateMap, onSetTravelRang
         onSetTravelRange?.(data.travel_hours);
       } else if (data.action === "select_camping" && data.camping_name) {
         onSelectCamping?.(data.camping_name);
+      } else if (data.action === "set_dates" && data.dates?.arrival && data.dates?.departure) {
+        onSetDates?.(data.dates);
       }
       setMessages((prev) => [...prev, { role: "assistant", content: data.message }]);
     } catch {

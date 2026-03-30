@@ -1,8 +1,8 @@
 # plan — kampeerhub
 
 ##  Huidige staat
-Laatste wijziging: KAM-20 DONE (2026-03-29) — telefoon-first UI: toggle-knoppen voor lijst en chat in header; op mobile (< 768px) standaard verborgen zodat kaart vol scherm gebruikt (commit f8e2f51)
-Volgende: nieuwe Jira features of resterende LOW/INFO review issues
+Laatste wijziging: KAM-21 geïmplementeerd (2026-03-30) — probabilistisch beschikbaarheidsmodel; datumrij in CampingList; set_dates AI chat actie; availability badge per camping
+Volgende: backend unit tests, LOW/INFO code review issues
 Open: LOW/INFO issues uit code review, backend unit tests
 Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatPanel retry/timeout logica
 
@@ -33,7 +33,7 @@ Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatP
 6. Na elke PR: update de "Huidige staat" sectie hierboven
 7. Bij twijfel over architectuurkeuze: vraag, niet gokken
 
-## Project Status (2026-03-19, updated after KAM-16)
+## Project Status (2026-03-30, updated after KAM-21 aangemaakt)
 
 | Step | Status | Notes |
 |---|---|---|
@@ -65,7 +65,51 @@ Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatP
 | KAM-18 3D satellietflyover | Done | Mapbox GL JS in DetailOverlay; token runtime via `/api/config`; satelliet+terrain stijl; rAF rotatieanimatie; lazy-loaded; Render deploy werkend |
 | KAM-19 laadoptimalisatie | Reverted | Warmup+prefetch blokkeerden Overpass op Render → gebruikersverzoeken faalden; teruggedraaid (c58934b). Overpass rate limiting op gedeeld Render IP is het kernprobleem. |
 | KAM-20 telefoon-first UI | Done | Toggle-knoppen voor lijst/chat in header; mobile (< 768px) start met kaart volledig scherm; sidebar verdwijnt als beide verborgen; ChatPanel vult volledige hoogte als lijst verborgen |
+| KAM-21 beschikbaarheidsfilter | Done | Probabilistisch model; datumrij in CampingList; AI chat set_dates action; statische databronnen (INSEE, schoolvakanties, feestdagen, microregio's); nul runtime API-calls |
 | Backend unit tests | Not started | |
+
+## KAM-21 Implementatieplan
+
+### Volgorde
+1. **Statische data** — INSEE CSV → `backend/data/insee_occupancy.json`; schoolvakanties + feestdagen/ponts → `backend/data/holidays.json`; verzadigde microregio's → `backend/data/saturated_regions.json`
+2. **Backend scorefunctie** — `availability_score(camping, arrival, departure)` in `main.py`; laadt data bij startup; log-odds model; geeft categorie + p_beschikbaar terug
+3. **Backend endpoint** — `/api/campings` accepteert optionele `arrival` + `departure` query params; voegt `availability` veld toe per camping; aanbodsdichtheid pre-computed bij `enrich_tile_cozy`
+4. **Frontend datumrij** — bovenaan `CampingList`: twee native `<input type="date">` + verblijfsduurlabel; state via `onDatesChange` prop naar `page.tsx`
+5. **Frontend AI chat** — `set_dates` action in schema + ChatPanel handler
+6. **Frontend badge** — beschikbaarheidsindicator per campingkaart in lijst
+
+### Model architectuur
+```
+Stap 1: Eliminatiefilters (binair)
+  reservation=required + geen systeem  → "niet online te boeken"
+  HPA-type + verblijf < 7n + piek      → "minimumverblijf waarschijnlijk"
+
+Stap 2: Verzadigde microregio check
+  camping in polygoon + piek           → harde bodem kans
+
+Stap 3: Log-odds kansschatting
+  log_odds = logit(segment_prior)
+           + insee_dept_maand
+           + schoolvakantie_gewicht
+           + feestdag_pont_gewicht
+           + cancellatie_window_gewicht
+           + aanbodsdichtheid_gewicht
+  p_bezetting = sigmoid(log_odds)
+
+Stap 4: Verblijfsduurcorrectie
+  p_beschikbaar = (1 - p_bezetting) ^ (nachten / 7)
+```
+
+### Outputcategorieën
+| Label | Wanneer |
+|---|---|
+| Niet online te boeken | reservation=required + geen systeem |
+| Minimumverblijf waarschijnlijk | HPA + kort verblijf in piek |
+| Regio structureel vol | verzadigde microregio in piek |
+| Waarschijnlijk beschikbaar | p > 50% |
+| Onzeker | 20–50% |
+| Waarschijnlijk vol | < 20% |
+| Onvoldoende data | geen Atout France + geen capaciteit |
 
 ---
 
