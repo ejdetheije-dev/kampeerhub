@@ -70,7 +70,7 @@ Let op: /zoeken/?q= en /campsite/search/q/ werken niet (404 of toont alle 9680 c
 21. **E2E tests** — DONE: Playwright in `test/`; `docker-compose.test.yml` (LLM_MOCK=true, tmpfs DB, poort 8001); `globalSetup.ts` maakt admin aan vóór tests; 14 tests in 4 bestanden (auth/admin/api/app); alle 14 geslaagd in ~22s
 22. **KAM-19 laadoptimalisatie** — REVERTED: warmup/prefetch/adaptive polling veroorzaakten Overpass rate limiting op Render waardoor gebruikersverzoeken ook blokkeerden; teruggedraaid naar pre-KAM-19 on-demand laden (commit c58934b)
 23. **Telefoon-first UI** — DONE (KAM-20): toggle-knoppen "lijst" en "chat" in header; op mobile (< 768px) standaard verborgen zodat kaart vol scherm in landscape; `fullHeight` prop op ChatPanel vult zijbalk als lijst verborgen is
-24. **Beschikbaarheidsfilter op datum** — TODO (KAM-21): probabilistisch model zonder runtime API-calls; datumrij bovenaan CampingList (native date inputs); AI chat `set_dates` action; statische databronnen: INSEE bezettingsgraad, schoolvakanties, feestdagen/ponts, verzadigde microregio-polygonen; log-odds model met verblijfsduurcorrectie; aanbodsdichtheid pre-computed bij tile-opslag
+24. **Beschikbaarheidsfilter op datum** — DONE (KAM-21): probabilistisch model; datumrij bovenaan CampingList; availability badge per camping; kaartpins kleurgecodeerd; AI chat `set_dates` action; alle statische data embedded in `main.py` (geen losse databestanden)
 
 ---
 
@@ -200,3 +200,8 @@ Empirische verdeling van 60 gesampled Franse campingwebsites:
 - **Water filter + zoom**: `FilterPanel` ontvangt `tooFarOut` prop; water checkbox is disabled + toont uitleg als kaart niet ingezoomd is. Bounding box bij zoom < 9 bevat >16 tiles → water endpoint geeft leeg terug.
 - **Auth op /api/chat**: `_require_session()` helper vereist geldig Bearer token. `ChatPanel` stuurt `authToken` mee via Authorization header.
 - **Hydration fix**: `Home` component leest `localStorage` via `useEffect`, niet in `useState` initializer — voorkomt mismatch tussen server-rendered HTML en client.
+- **Availability scoring**: `availability_score(camping, arrival_str, departure_str)` in `main.py`; statische data als module-level constanten (geen losse bestanden); log-odds model → sigmoid → verblijfsduurcorrectie `(1 - p)^(nachten/7)`; alle campings krijgen een score ook zonder OSM capacity-tag (nationaal gemiddelde als baseline).
+- **Availability statische data**: `_SCHOOL_HOLIDAY_RANGES` (2025-2027), `_FR_PUBLIC_HOLIDAYS`, `_MONTHLY_PRIOR` (INSEE), `_SATURATED_REGIONS` (8 cirkels met center+radius_km) — allemaal embedded in `main.py`.
+- **useOverpass met datums**: hook accepteert optionele `dates: { arrival, departure }` param; intern via `datesRef` (stable ref, altijd actueel bij load-aanroep); aparte `useEffect` op `datesKey` triggert re-fetch als datums wijzigen terwijl bounds al geladen zijn; polling hergebruikt `datesRef.current` zodat cancellatie-window correct is.
+- **Availability kaartpins**: `MapPanel` leest `camping.availability.label`; kleur overrulet de normale blauwe kleur (maar niet selected/dimmed); groen=beschikbaar, geel=onzeker, rood=vol/regio vol, oranje=minimumverblijf; tooltip toont label naast naam.
+- **set_dates chat actie**: `DatesPayload(arrival, departure)` in `ChatResponse`; `SYSTEM_PROMPT` bevat voorbeeld; `ChatPanel` roept `onSetDates` aan; `page.tsx` propageert naar `useOverpass` en `CampingList`.

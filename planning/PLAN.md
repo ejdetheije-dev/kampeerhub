@@ -1,10 +1,10 @@
 # plan — kampeerhub
 
 ##  Huidige staat
-Laatste wijziging: KAM-21 geïmplementeerd (2026-03-30) — probabilistisch beschikbaarheidsmodel; datumrij in CampingList; set_dates AI chat actie; availability badge per camping
+Laatste wijziging: KAM-21 volledig afgerond en gemerged naar main (2026-03-30)
 Volgende: backend unit tests, LOW/INFO code review issues
 Open: LOW/INFO issues uit code review, backend unit tests
-Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatPanel retry/timeout logica
+Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatPanel retry/timeout logica, availability scoring gewichten
 
 ## asyncio.to_thread — ontwerpbeslissing (bijgewerkt na KAM-14)
 
@@ -33,7 +33,7 @@ Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatP
 6. Na elke PR: update de "Huidige staat" sectie hierboven
 7. Bij twijfel over architectuurkeuze: vraag, niet gokken
 
-## Project Status (2026-03-30, updated after KAM-21 aangemaakt)
+## Project Status (2026-03-30, updated after KAM-21 afgerond)
 
 | Step | Status | Notes |
 |---|---|---|
@@ -68,48 +68,49 @@ Niet aanraken zonder overleg: filter logic (KAM-7), DetailOverlay (KAM-8), ChatP
 | KAM-21 beschikbaarheidsfilter | Done | Probabilistisch model; datumrij in CampingList; AI chat set_dates action; statische databronnen (INSEE, schoolvakanties, feestdagen, microregio's); nul runtime API-calls |
 | Backend unit tests | Not started | |
 
-## KAM-21 Implementatieplan
+## KAM-21 Implementatienotes (geïmplementeerd 2026-03-30)
 
-### Volgorde
-1. **Statische data** — INSEE CSV → `backend/data/insee_occupancy.json`; schoolvakanties + feestdagen/ponts → `backend/data/holidays.json`; verzadigde microregio's → `backend/data/saturated_regions.json`
-2. **Backend scorefunctie** — `availability_score(camping, arrival, departure)` in `main.py`; laadt data bij startup; log-odds model; geeft categorie + p_beschikbaar terug
-3. **Backend endpoint** — `/api/campings` accepteert optionele `arrival` + `departure` query params; voegt `availability` veld toe per camping; aanbodsdichtheid pre-computed bij `enrich_tile_cozy`
-4. **Frontend datumrij** — bovenaan `CampingList`: twee native `<input type="date">` + verblijfsduurlabel; state via `onDatesChange` prop naar `page.tsx`
-5. **Frontend AI chat** — `set_dates` action in schema + ChatPanel handler
-6. **Frontend badge** — beschikbaarheidsindicator per campingkaart in lijst
+### Wat gebouwd
+- `availability_score(camping, arrival_str, departure_str)` in `main.py` — statische data als module-level constanten, geen losse databestanden
+- `/api/campings` accepteert optionele `arrival` + `departure` query params; voegt `availability: {label, p}` toe per camping
+- `useOverpass` hook: `dates` param + `datesKey` effect voor re-fetch bij datumwijziging
+- `CampingList`: datumrij (Van/tot + nachten) bovenaan, availability badge per camping
+- `MapPanel`: pin-kleur op basis van availability.label wanneer datums ingesteld
+- `ChatPanel`: `set_dates` actie propageert naar `page.tsx` → `useOverpass` + `CampingList`
 
-### Model architectuur
+### Model (zoals geïmplementeerd)
 ```
-Stap 1: Eliminatiefilters (binair)
-  reservation=required + geen systeem  → "niet online te boeken"
-  HPA-type + verblijf < 7n + piek      → "minimumverblijf waarschijnlijk"
+Stap 1: Eliminatie
+  reservation=required → "Niet online te boeken"
+  capacity > 200 + piek + nachten < 7 → "Minimumverblijf waarschijnlijk"
+  _in_saturated_region() + piek → "Regio structureel vol"
 
-Stap 2: Verzadigde microregio check
-  camping in polygoon + piek           → harde bodem kans
+Stap 2: Log-odds
+  log_odds = logit(MONTHLY_PRIOR[maand])
+           + 0.7 indien schoolvakantie
+           + 0.25 indien feestdag
+           + 0.5 indien cozy of capacity < 30
+           - 0.2 indien capacity > 200
+           - 0.3 cancellatie-window (21-42 dagen voor piek)
 
-Stap 3: Log-odds kansschatting
-  log_odds = logit(segment_prior)
-           + insee_dept_maand
-           + schoolvakantie_gewicht
-           + feestdag_pont_gewicht
-           + cancellatie_window_gewicht
-           + aanbodsdichtheid_gewicht
-  p_bezetting = sigmoid(log_odds)
-
-Stap 4: Verblijfsduurcorrectie
-  p_beschikbaar = (1 - p_bezetting) ^ (nachten / 7)
+Stap 3: Verblijfsduurcorrectie
+  p_available = (1 - sigmoid(log_odds)) ^ (nachten / 7)
 ```
 
-### Outputcategorieën
-| Label | Wanneer |
-|---|---|
-| Niet online te boeken | reservation=required + geen systeem |
-| Minimumverblijf waarschijnlijk | HPA + kort verblijf in piek |
-| Regio structureel vol | verzadigde microregio in piek |
-| Waarschijnlijk beschikbaar | p > 50% |
-| Onzeker | 20–50% |
-| Waarschijnlijk vol | < 20% |
-| Onvoldoende data | geen Atout France + geen capaciteit |
+### Outputcategorieën en kaartkleur
+| Label | p | Kaartpin |
+|---|---|---|
+| Waarschijnlijk beschikbaar | > 0.50 | groen #4caf50 |
+| Onzeker | 0.20–0.50 | geel #f59e0b |
+| Waarschijnlijk vol | < 0.20 | rood #ef4444 |
+| Regio structureel vol | 0.05 (hard) | rood #ef4444 |
+| Minimumverblijf waarschijnlijk | — | oranje #f97316 |
+| Niet online te boeken | — | standaardkleur |
+
+### Designbeslissingen
+- Statische data in `main.py` (niet in losse JSON-bestanden) — eenvoudiger, geen file I/O bij startup
+- Alle campings krijgen een score, ook zonder OSM `capacity` tag — nationaal maandgemiddelde als baseline
+- `datesRef` patroon in `useOverpass`: stable `useCallback` + mutable ref zodat polling altijd de meest recente datums gebruikt
 
 ---
 
